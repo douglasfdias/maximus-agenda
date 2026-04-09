@@ -156,7 +156,7 @@ input,select,textarea{font-family:inherit}
 <script>
 // ══ CONSTANTS ══════════════════════════════════════
 // Cole aqui a URL do seu Google Apps Script Web App (após configurar):
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwdDfTInsBJyOubD3K69VVHCRp2j6bLSbK8ysKW8QeexAEZkLID1bzSXEdv-XquQATwIA/exec';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
+const SHEETS_URL = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
 
 const CHN={
   Iza:   {e:'👧',g:'6º ano',c:'var(--iza)',l:'var(--izal)',b:'var(--izab)'},
@@ -366,7 +366,7 @@ function renderDash(){
     ${sc(pvs.length,'Provas','#6A1B9A','#F3E5F5',"go('calendario')")}
   </div>`;
 
-  if(!SHEETS_URL){
+  if(!_sheetsUrl()){
     h+=`<div class="sync-bar">
       <span style="font-size:18px">📋</span>
       <div style="flex:1"><div style="font-weight:800;font-size:13px">Conectar Google Sheets</div>
@@ -652,7 +652,7 @@ function _saveItem(id,isE){
   DB.log({type:isE?'edit':'add',msg:`${isE?'Editado':'Novo'}: ${item.titulo} — ${item.materia} (${item.filho})`});
   S.log=DB.gl();
   closeAll();render();updateBadge();
-  if(SHEETS_URL) syncToSheets();
+  if(_sheetsUrl()) syncToSheets();
 }
 
 function _renderBulk(){
@@ -699,7 +699,7 @@ function _processBulk(){
   DB.log({type:'bulk',msg:`${added} item(s) adicionados em lote`});
   S.log=DB.gl();
   closeAll();render();updateBadge();
-  if(SHEETS_URL) syncToSheets();
+  if(_sheetsUrl()) syncToSheets();
   setTimeout(()=>alert(`✅ ${added} item(s) adicionado(s)!`),100);
 }
 
@@ -779,14 +779,17 @@ const _sheetsUrl=()=>SHEETS_URL||localStorage.getItem('mx4_sheetsUrl')||'';
 
 async function syncSheets(){
   const url=_sheetsUrl();
-  if(!url) return;
+  if(!url){alert('Configure a URL do Google Sheets primeiro (botão Configurar na tela Início).');return;}
   S.syncing=true;renderHdr();
   try{
-    // Busca dados do Sheets
+    // 1. Busca dados da planilha
     const res=await fetch(url+'?action=get');
+    if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'Erro desconhecido');
+
+    // Merge: planilha tem prioridade sobre local
     if(data.items&&data.items.length){
-      // Merge: itens do Sheets têm prioridade, mas mantém itens locais não presentes no Sheets
       const sheetsIds=new Set(data.items.map(i=>i.id));
       const localOnly=S.items.filter(i=>!sheetsIds.has(i.id));
       S.items=[...data.items,...localOnly];
@@ -798,14 +801,16 @@ async function syncSheets(){
       S.notas=[...data.notas,...localOnly];
       DB.sn(S.notas);
     }
-    // Envia dados locais para o Sheets
-    await syncToSheets();
+
+    // 2. Envia dados locais para a planilha
+    await _postToSheets(url);
+
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     DB.sSync(now);
     DB.log({type:'sync',msg:`Sincronizado com Google Sheets às ${now}`});
     S.log=DB.gl();
   }catch(e){
-    alert('Erro ao sincronizar: '+e.message+'\n\nVerifique se a URL está correta e se o Apps Script está implantado com acesso público.');
+    alert('Erro ao sincronizar:\n'+e.message+'\n\nDicas:\n• A URL está correta?\n• O Apps Script foi implantado com acesso "Qualquer pessoa"?\n• O SHEET_ID está configurado no script?');
   }finally{
     S.syncing=false;renderHdr();render();updateBadge();
   }
@@ -814,10 +819,18 @@ async function syncSheets(){
 async function syncToSheets(){
   const url=_sheetsUrl();
   if(!url) return;
-  try{
-    await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'set',items:S.items,notas:S.notas})});
-  }catch(e){ console.warn('Sync to sheets failed:',e.message); }
+  try{ await _postToSheets(url); }catch(e){ console.warn('Sync to sheets failed:',e.message); }
+}
+
+async function _postToSheets(url){
+  // Apps Script Web App aceita POST com JSON
+  const res=await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain'},// text/plain evita preflight CORS
+    body:JSON.stringify({items:S.items,notas:S.notas}),
+    redirect:'follow',
+  });
+  if(!res.ok) throw new Error('POST falhou: HTTP '+res.status);
 }
 
 // ══ ACTIONS ══════════════════════════════════════════
@@ -848,9 +861,43 @@ function delNota(id){
   DB.sn(S.notas);render();
 }
 
-// ══ PWA ══════════════════════════════════════════════
-if('serviceWorker' in navigator)
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+// ══ PWA + UPDATE ═════════════════════════════════════
+let _swReg=null;
+if('serviceWorker' in navigator){
+  window.addEventListener('load',async()=>{
+    try{
+      _swReg=await navigator.serviceWorker.register('sw.js');
+      // Verifica atualizações ao abrir
+      _swReg.addEventListener('updatefound',()=>{
+        const nw=_swReg.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller){
+            // Nova versão disponível — mostra banner
+            const bar=document.createElement('div');
+            bar.id='update-bar';
+            bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:#1565C0;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;font-family:Nunito,sans-serif;font-size:13px;font-weight:800';
+            bar.innerHTML='<span style="flex:1">🆕 Nova versão disponível!</span><button onclick="atualizarApp()" style="background:#fff;color:#1565C0;border:none;border-radius:8px;padding:6px 14px;font-family:Nunito,sans-serif;font-size:13px;font-weight:900;cursor:pointer">Atualizar agora</button>';
+            document.body.prepend(bar);
+          }
+        });
+      });
+    }catch(e){}
+  });
+}
+
+function atualizarApp(){
+  if(_swReg&&_swReg.waiting){
+    _swReg.waiting.postMessage({type:'SKIP_WAITING'});
+  }
+  window.location.reload();
+}
+
+// Verificação manual de atualização (botão no header futuro)
+async function checkUpdate(){
+  if(!_swReg) return;
+  await _swReg.update();
+  alert('Verificação concluída. Se houver atualização, um aviso aparecerá no topo.');
+}
 
 init();
 </script>
