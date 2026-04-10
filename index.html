@@ -156,7 +156,7 @@ input,select,textarea{font-family:inherit}
 <script>
 // ══ CONSTANTS ══════════════════════════════════════
 // Cole aqui a URL do seu Google Apps Script Web App (após configurar):
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbz6xUTGCrUvTK617km2aNzJJ_akVrTKugqOTe-TaphuDZnDaK3nRFTDu-SlNVZLRVnu0Q/exec';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
+const SHEETS_URL = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
 
 const CHN={
   Iza:   {e:'👧',g:'6º ano',c:'var(--iza)',l:'var(--izal)',b:'var(--izab)'},
@@ -788,21 +788,27 @@ async function syncSheets(){
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'Erro desconhecido');
 
-    // Merge: planilha tem prioridade sobre local
-    if(data.items&&data.items.length){
-      const sheetsIds=new Set(data.items.map(i=>i.id));
-      const localOnly=S.items.filter(i=>!sheetsIds.has(i.id));
-      S.items=[...data.items,...localOnly];
-      DB.si(S.items);
-    }
-    if(data.notas&&data.notas.length){
-      const sheetsIds=new Set(data.notas.map(n=>n.id));
-      const localOnly=S.notas.filter(n=>!sheetsIds.has(n.id));
-      S.notas=[...data.notas,...localOnly];
-      DB.sn(S.notas);
-    }
+    // ── MERGE BIDIRECIONAL ──
+    // Regra: planilha é fonte de verdade para itens existentes.
+    // Itens novos do app (não presentes na planilha) são adicionados.
+    // Resultado final é enviado de volta para a planilha.
 
-    // 2. Envia dados locais para a planilha
+    const mergeArrays = (fromSheets, fromLocal) => {
+      // IDs vindos da planilha (podem ter sido editados lá)
+      const sheetsMap = new Map(fromSheets.map(i => [i.id, i]));
+      // IDs locais que não existem na planilha = novos do app
+      const onlyLocal = fromLocal.filter(i => i.id && !sheetsMap.has(i.id));
+      // Resultado: todos da planilha + novos do app
+      return [...fromSheets, ...onlyLocal];
+    };
+
+    // Sempre aplica (mesmo que planilha venha vazia — significa que foi limpa)
+    S.items = mergeArrays(data.items || [], S.items);
+    S.notas = mergeArrays(data.notas || [], S.notas);
+    DB.si(S.items);
+    DB.sn(S.notas);
+
+    // 2. Envia conjunto mesclado de volta para a planilha
     await _postToSheets(url);
 
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -823,14 +829,23 @@ async function syncToSheets(){
 }
 
 async function _postToSheets(url){
-  // Apps Script Web App aceita POST com JSON
-  const res=await fetch(url,{
-    method:'POST',
-    headers:{'Content-Type':'text/plain'},// text/plain evita preflight CORS
-    body:JSON.stringify({items:S.items,notas:S.notas}),
-    redirect:'follow',
-  });
-  if(!res.ok) throw new Error('POST falhou: HTTP '+res.status);
+  // Apps Script Web App faz redirect 302 em POSTs externos, convertendo para GET e perdendo o body.
+  // Solução: enviar tudo via GET com dados comprimidos em parâmetro de URL.
+  // Dividimos em dois GETs se necessário (items e notas separados) para não exceder limite de URL.
+  await _getSync(url, 'setItems', S.items);
+  await _getSync(url, 'setNotas', S.notas);
+}
+
+async function _getSync(url, action, data){
+  const json = JSON.stringify(data);
+  // Codifica em base64 para evitar caracteres especiais na URL
+  const b64  = btoa(unescape(encodeURIComponent(json)));
+  const res  = await fetch(url + '?action=' + action + '&data=' + encodeURIComponent(b64));
+  // Apps Script redireciona — o resultado pode não ser JSON se vier vazio, ignora silenciosamente
+  try {
+    const r = await res.json();
+    if (r && r.ok === false) console.warn('Sheets error:', r.error);
+  } catch(e) { /* redirect resultou em HTML, ignorar */ }
 }
 
 // ══ ACTIONS ══════════════════════════════════════════
