@@ -1,6 +1,6 @@
 {
   "name": "Agenda Escolar Máximus",
-  "short_name": "Máximus Agenda",
+  "short_name": "Máximus",
   "description": "Agenda escolar de Iza e Israel",
   "start_url": "/maximus-agenda/",
   "scope": "/maximus-agenda/",
@@ -11,5 +11,24 @@
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+  ],
+  "share_target": {
+    "action": "/maximus-agenda/",
+    "method": "GET",
+    "params": {
+      "title": "share_title",
+      "text": "share_text",
+      "url": "share_url"
+    }
+  },
+  "share_target_media": {
+    "action": "/maximus-agenda/?share=image",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        { "name": "image", "accept": ["image/*"] }
+      ]
+    }
+  }
 }
