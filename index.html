@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Máximus">
@@ -225,6 +226,10 @@ const DB={
   log(e){const l=DB.gl();l.unshift({...e,ts:Date.now()});DB.sl(l.slice(0,80))},
   gSync(){return localStorage.getItem('mx4_sync')||''},
   sSync(v){localStorage.setItem('mx4_sync',v)},
+  gc(){return JSON.parse(localStorage.getItem('mx4_coms')||'[]')},
+  sc(v){localStorage.setItem('mx4_coms',JSON.stringify(v))},
+  gk(){return localStorage.getItem('mx4_gemini')||''},
+  sk(v){localStorage.setItem('mx4_gemini',v)},
 };
 
 function sampleItems(){
@@ -1204,6 +1209,15 @@ async function syncSheets(){
     // 2. Envia conjunto mesclado de volta para a planilha
     await _postToSheets(url);
 
+    // Sync comunicados
+    if(data.coms){
+      const sheetsIds=new Set(data.coms.map(c=>c.id));
+      const localOnly=S.coms.filter(c=>c.id&&!sheetsIds.has(c.id));
+      S.coms=[...data.coms,...localOnly];
+      DB.sc(S.coms);
+    }
+    await syncComToSheets();
+
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     DB.sSync(now);
     DB.log({type:'sync',msg:`Sincronizado com Google Sheets às ${now}`});
@@ -1310,59 +1324,7 @@ async function checkUpdate(){
   alert('Verificação concluída. Se houver atualização, um aviso aparecerá no topo.');
 }
 
-// ══ SHARE TARGET (Android) ═══════════════════════════
-// Detecta quando o app é aberto via share sheet com uma imagem
-async function handleShareTarget(){
-  const params=new URLSearchParams(window.location.search);
-  if(params.has('share') && params.get('share')==='image'){
-    // Busca o arquivo compartilhado via Cache API
-    const cache=await caches.open('share-target');
-    const keys=await cache.keys();
-    if(keys.length){
-      const res=await cache.match(keys[0]);
-      const blob=await res.blob();
-      const b64=await new Promise(ok=>{
-        const r=new FileReader();
-        r.onload=e=>ok(e.target.result);
-        r.readAsDataURL(blob);
-      });
-      await cache.delete(keys[0]);
-      // Abre import form com a imagem já carregada
-      setTimeout(()=>{
-        openComImport();
-        setTimeout(()=>{
-          window._impImg=b64;
-          const prev=document.getElementById('imp-prev-area');
-          if(prev) prev.innerHTML=`<img src="${b64}" style="width:100%;border-radius:9px;margin-top:10px;max-height:200px;object-fit:contain">`;
-        },200);
-      },300);
-    }
-    // Limpa o parâmetro da URL sem recarregar
-    window.history.replaceState({},'','/maximus-agenda/');
-  }
-}
-
-// Inclui comunicados no sync
-const _origSyncSheets = syncSheets;
-async function syncSheetsCompleto(){
-  await _origSyncSheets();
-  // Sync adicional para comunicados
-  const url=_sheetsUrl(); if(!url) return;
-  try{
-    const res=await fetch(url+'?action=get');
-    const data=await res.json();
-    if(data.coms){
-      const sheetsIds=new Set(data.coms.map(c=>c.id));
-      const localOnly=S.coms.filter(c=>c.id&&!sheetsIds.has(c.id));
-      S.coms=[...data.coms,...localOnly];
-      DB.sc(S.coms);
-    }
-    await syncComToSheets();
-  }catch(e){ console.warn('Coms sync failed:',e.message); }
-}
-
 init();
-handleShareTarget();
 </script>
 </body>
 </html>
