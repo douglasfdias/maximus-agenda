@@ -13,21 +13,18 @@
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "share_target": {
-    "action": "/maximus-agenda/",
-    "method": "GET",
-    "params": {
-      "title": "share_title",
-      "text": "share_text",
-      "url": "share_url"
-    }
-  },
-  "share_target_media": {
     "action": "/maximus-agenda/?share=image",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
       "files": [
-        { "name": "image", "accept": ["image/*"] }
+        {
+          "name": "image",
+          "accept": ["image/jpeg", "image/png", "image/gif", "image/webp"]
+        }
       ]
     }
   }
