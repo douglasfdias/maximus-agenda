@@ -244,7 +244,8 @@ const S={
   tmode:'lista',
   cal:new Date(),calSel:null,
   nFilho:'Iza',nBim:'Todos',
-  items:[],notas:[],log:[],
+  items:[],notas:[],log:[],coms:[],
+  comTag:'Todos',
   syncing:false,
 };
 
@@ -595,8 +596,9 @@ function renderAvisos(){
 }
 
 // ══ COMUNICADOS ══════════════════════════════════════
+const _gemKey=()=>GEMINI_KEY||DB.gk()||'';
+
 function renderComunicados(){
-  const _gemKey=()=>GEMINI_KEY||DB.gk()||'';
   let h=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
     <input id="com-search" type="search" placeholder="🔍 Buscar comunicados..."
       style="flex:1;border:2px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;background:var(--bg);font-family:inherit;outline:none"
@@ -611,7 +613,8 @@ function renderComunicados(){
   <div id="com-list"></div>`;
 
   // Gemini key banner
-  if(!_gemKey()){
+  const hasGemKey=!!_gemKey();
+  if(!hasGemKey){
     h=`<div style="background:var(--purl);border:1.5px solid var(--purb);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center">
       <span style="font-size:20px">🤖</span>
       <div style="flex:1"><div style="font-weight:800;font-size:13px;color:var(--pur)">Configure o Gemini para importar prints</div>
@@ -619,7 +622,7 @@ function renderComunicados(){
       <button onclick="openGeminiSetup()" class="btn" style="padding:6px 12px;font-size:12px;background:var(--pur);color:#fff;font-weight:800">Configurar</button>
     </div>`+h;
   }
-  setTimeout(renderComunicadosList, 0);
+  setTimeout(renderComunicadosList, 50);
   return h;
 }
 
@@ -1164,11 +1167,6 @@ function salvarGeminiKey(){
   alert('✅ Chave salva! Agora você pode importar mensagens com IA.');
 }
 
-async function syncComToSheets(){
-  const url=_sheetsUrl(); if(!url) return;
-  try{ await _getSync(url,'setComs',S.coms); }catch(e){ console.warn('Com sync failed:',e.message); }
-}
-
 // ══ SYNC COM SHEETS ══════════════════════════════════
 const _sheetsUrl=()=>SHEETS_URL||localStorage.getItem('mx4_sheetsUrl')||'';
 
@@ -1233,14 +1231,17 @@ async function _postToSheets(url){
 
 async function _getSync(url, action, data){
   const json = JSON.stringify(data);
-  // Codifica em base64 para evitar caracteres especiais na URL
   const b64  = btoa(unescape(encodeURIComponent(json)));
   const res  = await fetch(url + '?action=' + action + '&data=' + encodeURIComponent(b64));
-  // Apps Script redireciona — o resultado pode não ser JSON se vier vazio, ignora silenciosamente
   try {
     const r = await res.json();
     if (r && r.ok === false) console.warn('Sheets error:', r.error);
   } catch(e) { /* redirect resultou em HTML, ignorar */ }
+}
+
+async function syncComToSheets(){
+  const url=_sheetsUrl(); if(!url) return;
+  try{ await _getSync(url,'setComs',S.coms); }catch(e){ console.warn('Com sync failed:',e.message); }
 }
 
 // ══ ACTIONS ══════════════════════════════════════════
