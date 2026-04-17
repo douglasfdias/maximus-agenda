@@ -150,6 +150,7 @@ input,select,textarea{font-family:inherit}
     <button class="nb" data-v="calendario" onclick="go('calendario')"><span class="ni">📅</span><span class="nl">Calendário</span></button>
     <button class="nb" data-v="notas" onclick="go('notas')"><span class="ni">📊</span><span class="nl">Notas</span></button>
     <button class="nb" data-v="avisos" onclick="go('avisos')"><span class="ni">🔔</span><span class="nl">Avisos</span><span class="badge" id="alert-badge" style="display:none">0</span></button>
+    <button class="nb" data-v="comunicados" onclick="go('comunicados')"><span class="ni">📌</span><span class="nl">Comunicados</span></button>
   </nav>
   <button id="fab" onclick="openForm()">+</button>
 </div>
@@ -157,6 +158,18 @@ input,select,textarea{font-family:inherit}
 // ══ CONSTANTS ══════════════════════════════════════
 // Cole aqui a URL do seu Google Apps Script Web App (após configurar):
 const SHEETS_URL = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
+
+// Chave de API do Gemini (gratuita em aistudio.google.com):
+const GEMINI_KEY = '';  // Ex: 'AIzaSy...'
+
+const ETIQUETAS = [
+  'Faltou/Dever','Material incomp','Biblioteca','Atividade Aval.','Calendário',
+  'Atraso','Convite','Material Apoio','Notificação','Uso de celular','Lembrete',
+  'Sem uniforme','Trab. sem fazer','Conteúdo Prova','Ocorrência','Trabalho',
+  'Dever não feito','Importante','Comunicado','Rotina','Urgente','Notícias',
+  'Dever de casa','Outros',
+];
+const TIPOS_COM = ['Comunicado','Aviso','Evento','Reunião','Financeiro','Outros'];
 
 const CHN={
   Iza:   {e:'👧',g:'6º ano',c:'var(--iza)',l:'var(--izal)',b:'var(--izab)'},
@@ -236,7 +249,7 @@ const S={
 };
 
 function init(){
-  S.items=DB.gi();S.notas=DB.gn();S.log=DB.gl();
+  S.items=DB.gi();S.notas=DB.gn();S.log=DB.gl();S.coms=DB.gc();
   renderHdr();render();updateBadge();
 }
 
@@ -336,7 +349,7 @@ function setFilho(f){S.filho=f;renderHdr();render();}
 
 function render(){
   const c=document.getElementById('content');
-  const views={dashboard:renderDash,tarefas:renderTarefas,calendario:renderCal,notas:renderNotas,avisos:renderAvisos};
+  const views={dashboard:renderDash,tarefas:renderTarefas,calendario:renderCal,notas:renderNotas,avisos:renderAvisos,comunicados:renderComunicados};
   c.innerHTML=(views[S.view]||renderDash)();
 }
 
@@ -581,22 +594,128 @@ function renderAvisos(){
   return h;
 }
 
+// ══ COMUNICADOS ══════════════════════════════════════
+function renderComunicados(){
+  const _gemKey=()=>GEMINI_KEY||DB.gk()||'';
+  let h=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+    <input id="com-search" type="search" placeholder="🔍 Buscar comunicados..."
+      style="flex:1;border:2px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;background:var(--bg);font-family:inherit;outline:none"
+      oninput="renderComunicadosList()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+    <button onclick="openComImport()" class="btn ba" style="padding:9px 13px;font-size:18px;flex-shrink:0" title="Importar via IA">🤖</button>
+    <button onclick="openComForm()" class="btn bp" style="padding:9px 13px;font-size:18px;flex-shrink:0" title="Adicionar manual">+</button>
+  </div>
+  <div class="cr" id="com-tags" style="margin-bottom:12px">
+    ${['Todos',...ETIQUETAS].map(t=>`<button onclick="S.comTag='${t}';renderComunicadosList()" class="chip"
+      style="cursor:pointer;white-space:nowrap;${(S.comTag||'Todos')===t?'background:var(--al);color:var(--accent);border-color:var(--accent)':'background:var(--bg);color:var(--t2);border-color:var(--border)'}">${t}</button>`).join('')}
+  </div>
+  <div id="com-list"></div>`;
+
+  // Gemini key banner
+  if(!_gemKey()){
+    h=`<div style="background:var(--purl);border:1.5px solid var(--purb);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center">
+      <span style="font-size:20px">🤖</span>
+      <div style="flex:1"><div style="font-weight:800;font-size:13px;color:var(--pur)">Configure o Gemini para importar prints</div>
+      <div style="font-size:11px;color:var(--t2);margin-top:1px">Chave gratuita em aistudio.google.com</div></div>
+      <button onclick="openGeminiSetup()" class="btn" style="padding:6px 12px;font-size:12px;background:var(--pur);color:#fff;font-weight:800">Configurar</button>
+    </div>`+h;
+  }
+  setTimeout(renderComunicadosList, 0);
+  return h;
+}
+
+function renderComunicadosList(){
+  const el=document.getElementById('com-list');
+  if(!el) return;
+  const q=(document.getElementById('com-search')?.value||'').toLowerCase();
+  const tag=S.comTag||'Todos';
+  const filho=S.filho;
+
+  let coms=S.coms
+    .filter(c=>tag==='Todos'||c.etiqueta===tag)
+    .filter(c=>filho==='Todos'||c.filho===filho||c.filho==='Ambos')
+    .filter(c=>!q||(c.titulo+c.conteudo+c.remetente+c.etiqueta).toLowerCase().includes(q))
+    .sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+
+  if(!coms.length){
+    el.innerHTML=`<div class="empty"><div class="ei">📌</div><p>${q?'Nenhum resultado':'Nenhum comunicado'}</p><p style="font-size:13px;color:var(--t3);margin-top:4px">Use 🤖 para importar um print ou + para adicionar</p></div>`;
+    return;
+  }
+  el.innerHTML=coms.map(c=>{
+    const pin=c.fixado?'background:var(--al);border-color:var(--yelb)':'';
+    return`<div class="card" style="${pin};margin-bottom:10px" id="cc-${c.id}">
+      <div class="card-header" style="background:${c.fixado?'var(--yell)':'var(--bg)'};border-bottom:1.5px solid var(--border)">
+        <span style="font-size:12px;font-weight:900;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${c.etiqueta||'Comunicado'} ${c.fixado?'· 📌 Fixado':''}
+        </span>
+        <div style="display:flex;gap:1px">
+          <button onclick="togglePin('${c.id}')" style="padding:6px;font-size:14px;color:var(--t3)" title="Fixar">${c.fixado?'📌':'📍'}</button>
+          <button onclick="openComEdit('${c.id}')" style="padding:6px;font-size:14px;color:var(--t3)"
+            onmouseenter="this.style.color='var(--isr)'" onmouseleave="this.style.color='var(--t3)'">✏️</button>
+          <button onclick="delCom('${c.id}')" style="padding:6px;font-size:14px;color:var(--t3)"
+            onmouseenter="this.style.color='var(--red)'" onmouseleave="this.style.color='var(--t3)'">🗑️</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="font-weight:900;font-size:15px;line-height:1.4;margin-bottom:6px">${c.titulo}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+          ${c.filho?`<span class="chip sm" style="background:${CHN[c.filho]?.l||'#F5F5F5'};color:${CHN[c.filho]?.c||'#424242'};border-color:${CHN[c.filho]?.b||'#E0E0E0'}">${CHN[c.filho]?.e||''} ${c.filho}</span>`:''}
+          ${c.remetente?`<span class="chip sm" style="background:#F5F5F5;color:#424242;border-color:#E0E0E0">👤 ${c.remetente}</span>`:''}
+          ${c.data?`<span style="font-size:12px;color:var(--t2);font-weight:700;align-self:center">📅 ${fd(c.data)}</span>`:''}
+        </div>
+        ${c.conteudo?`<div style="font-size:13px;color:var(--t2);line-height:1.6;background:var(--bg);border-radius:9px;padding:9px 11px;white-space:pre-wrap">${c.conteudo}</div>`:''}
+        ${c.imagem?`<img src="${c.imagem}" style="width:100%;border-radius:9px;margin-top:8px;max-height:200px;object-fit:cover" onclick="verImagem('${c.id}')">`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function verImagem(id){
+  const c=S.coms.find(x=>x.id===id);if(!c||!c.imagem)return;
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML=`<img src="${c.imagem}" style="max-width:100%;max-height:90vh;border-radius:12px"><button onclick="this.parentElement.remove()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer">✕</button>`;
+  m.onclick=e=>{if(e.target===m)m.remove()};
+  document.body.appendChild(m);
+}
+
+function togglePin(id){
+  S.coms=S.coms.map(c=>c.id===id?{...c,fixado:!c.fixado}:c);
+  DB.sc(S.coms);
+  renderComunicadosList();
+  if(_sheetsUrl()) syncComToSheets();
+}
+
+function delCom(id){
+  if(!confirm('Excluir este comunicado?'))return;
+  S.coms=S.coms.filter(c=>c.id!==id);
+  DB.sc(S.coms);
+  renderComunicadosList();
+  if(_sheetsUrl()) syncComToSheets();
+}
+
 // ══ MODALS ═══════════════════════════════════════════
-let _editId=null,_showForm=false,_showBulk=false,_showNota=false,_showSync=false;
+let _editId=null,_showForm=false,_showBulk=false,_showNota=false,_showSync=false,_showCom=false,_showImport=false,_showGemini=false,_comEditId=null;
 
 function renderModals(){
   document.querySelectorAll('.mo').forEach(m=>m.remove());
-  if(_showForm)  _renderItemForm();
-  if(_showBulk)  _renderBulk();
-  if(_showNota)  _renderNotaForm();
-  if(_showSync)  _renderSyncSetup();
+  if(_showForm)   _renderItemForm();
+  if(_showBulk)   _renderBulk();
+  if(_showNota)   _renderNotaForm();
+  if(_showSync)   _renderSyncSetup();
+  if(_showCom)    _renderComForm();
+  if(_showImport) _renderImportForm();
+  if(_showGemini) _renderGeminiSetup();
 }
 function openForm(){_editId=null;_showForm=true;renderModals()}
 function openEdit(id){_editId=id;_showForm=true;renderModals()}
 function openBulk(){_showBulk=true;renderModals()}
 function openNota(){_showNota=true;renderModals()}
 function openSyncSetup(){_showSync=true;renderModals()}
-function closeAll(){_showForm=false;_showBulk=false;_showNota=false;_showSync=false;_editId=null;renderModals()}
+function openComForm(){_comEditId=null;_showCom=true;renderModals()}
+function openComEdit(id){_comEditId=id;_showCom=true;renderModals()}
+function openComImport(){_showImport=true;renderModals()}
+function openGeminiSetup(){_showGemini=true;renderModals()}
+function closeAll(){_showForm=false;_showBulk=false;_showNota=false;_showSync=false;_showCom=false;_showImport=false;_showGemini=false;_editId=null;_comEditId=null;renderModals()}
 
 function _mo(inner){
   const el=document.createElement('div');
@@ -774,6 +893,282 @@ function _saveSyncUrl(){
   alert('URL salva! Para tornar permanente, edite a constante SHEETS_URL no início do index.html e faça o upload novamente para o GitHub.');
 }
 
+// ══ COMUNICADOS — FORMULÁRIOS ════════════════════════
+function _renderComForm(){
+  const c=_comEditId?S.coms.find(x=>x.id===_comEditId):null;
+  const f=c||{id:uid(),titulo:'',filho:'Ambos',etiqueta:'Comunicado',tipo:'Comunicado',remetente:'',conteudo:'',data:'',fixado:false,imagem:''};
+  _mo(`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <span style="font-weight:900;font-size:18px">${c?'✏️ Editar':'📌 Novo comunicado'}</span>
+      <button onclick="closeAll()" style="font-size:22px;color:var(--t3);padding:4px 8px;border-radius:9px">✕</button>
+    </div>
+    <div class="fi"><label>Título *</label>
+      <input id="cf-titulo" value="${f.titulo}" placeholder="Ex: Informações sobre excursão ao museu"></div>
+    <div class="fr">
+      <div class="fi"><label>Filho</label><select id="cf-filho">${['Iza','Israel','Ambos'].map(n=>`<option${f.filho===n?' selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="fi"><label>Remetente</label><input id="cf-rem" value="${f.remetente}" placeholder="Ex: Coordenação"></div>
+    </div>
+    <div class="fr">
+      <div class="fi"><label>Etiqueta</label><select id="cf-etiq">${ETIQUETAS.map(e=>`<option${f.etiqueta===e?' selected':''}>${e}</option>`).join('')}</select></div>
+      <div class="fi"><label>Data</label><input type="date" id="cf-data" value="${f.data}"></div>
+    </div>
+    <div class="fi"><label>Conteúdo</label>
+      <textarea id="cf-cont" placeholder="Cole aqui o texto do comunicado...">${f.conteudo||''}</textarea></div>
+    <div class="fi"><label>Imagem (opcional)</label>
+      <input type="file" id="cf-img" accept="image/*" style="border:2px solid var(--border);border-radius:var(--rs);padding:9px;background:var(--bg);width:100%;font-size:13px">
+    </div>
+    ${f.imagem?`<img src="${f.imagem}" style="width:100%;border-radius:9px;margin-bottom:10px;max-height:150px;object-fit:cover">`:''}
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+      <input type="checkbox" id="cf-fix"${f.fixado?' checked':''} style="width:18px;height:18px;accent-color:var(--accent)">
+      <label for="cf-fix" style="font-size:13px;font-weight:700;cursor:pointer">📌 Fixar este comunicado</label>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeAll()" class="btn bs" style="flex:1">Cancelar</button>
+      <button onclick="_saveCom('${f.id}',${!!c})" class="btn bp" style="flex:2">${c?'Salvar':'Adicionar'}</button>
+    </div>`);
+
+  // Preview de imagem antes de salvar
+  document.getElementById('cf-img').onchange=function(){
+    const file=this.files[0]; if(!file) return;
+    const r=new FileReader();
+    r.onload=e=>{
+      let prev=document.getElementById('cf-img-prev');
+      if(!prev){prev=document.createElement('img');prev.id='cf-img-prev';prev.style.cssText='width:100%;border-radius:9px;margin-top:8px;max-height:150px;object-fit:cover';this.after(prev);}
+      prev.src=e.target.result;
+    };
+    r.readAsDataURL(file);
+  };
+}
+
+function _saveCom(id, isE){
+  const titulo=document.getElementById('cf-titulo').value.trim();
+  if(!titulo){alert('O título é obrigatório.');return;}
+  const file=document.getElementById('cf-img').files[0];
+  const salvar=(imgData)=>{
+    const com={id, titulo,
+      filho:document.getElementById('cf-filho').value,
+      etiqueta:document.getElementById('cf-etiq').value,
+      remetente:document.getElementById('cf-rem').value.trim(),
+      conteudo:document.getElementById('cf-cont').value.trim(),
+      data:document.getElementById('cf-data').value,
+      fixado:document.getElementById('cf-fix').checked,
+      imagem:imgData||(isE?S.coms.find(c=>c.id===id)?.imagem||'':''),
+    };
+    if(isE) S.coms=S.coms.map(c=>c.id===id?com:c);
+    else S.coms=[...S.coms,com];
+    DB.sc(S.coms);
+    DB.log({type:'add',msg:`Comunicado: ${com.titulo}`});
+    S.log=DB.gl();
+    closeAll(); render();
+    if(_sheetsUrl()) syncComToSheets();
+  };
+  if(file){
+    const r=new FileReader();
+    r.onload=e=>salvar(e.target.result);
+    r.readAsDataURL(file);
+  } else salvar(null);
+}
+
+// ══ IMPORTAÇÃO INTELIGENTE VIA GEMINI ════════════════
+function _renderImportForm(){
+  const hasKey=!!(GEMINI_KEY||DB.gk());
+  _mo(`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-weight:900;font-size:18px">🤖 Importar mensagem</span>
+      <button onclick="closeAll()" style="font-size:22px;color:var(--t3);padding:4px 8px;border-radius:9px">✕</button>
+    </div>
+    ${!hasKey?`<div style="background:var(--purl);border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:13px;color:var(--pur);font-weight:700">
+      ⚠️ Configure a chave do Gemini primeiro.
+      <button onclick="closeAll();openGeminiSetup()" style="margin-left:8px;background:var(--pur);color:#fff;border:none;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer">Configurar</button>
+    </div>`:''}
+    <div class="tgl" style="margin-bottom:14px" id="imp-tabs">
+      <button class="tbtn on" id="imp-tab-img" onclick="impTab('img')">📷 Imagem</button>
+      <button class="tbtn" id="imp-tab-txt" onclick="impTab('txt')">📋 Texto</button>
+    </div>
+    <div id="imp-img-area">
+      <div style="border:2px dashed var(--border);border-radius:var(--rs);padding:24px;text-align:center;cursor:pointer;background:var(--bg)"
+        onclick="document.getElementById('imp-file').click()">
+        <div style="font-size:36px;margin-bottom:8px">📷</div>
+        <div style="font-weight:800;color:var(--t2)">Selecionar imagem / print</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:4px">JPG, PNG — toque para abrir a galeria</div>
+      </div>
+      <input type="file" id="imp-file" accept="image/*" style="display:none" onchange="impPreview(this)">
+      <div id="imp-prev-area"></div>
+    </div>
+    <div id="imp-txt-area" style="display:none">
+      <div class="fi" style="margin:0"><label>Cole o texto da mensagem do ClassApp</label>
+        <textarea id="imp-txt" style="min-height:140px;font-size:13px" placeholder="Cole aqui o texto copiado da mensagem..."></textarea></div>
+    </div>
+    <div id="imp-result" style="margin-top:12px"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button onclick="closeAll()" class="btn bs" style="flex:1">Cancelar</button>
+      <button onclick="impProcessar()" class="btn ba" style="flex:2" id="imp-btn"${!hasKey?' disabled style="opacity:.5"':''}>
+        🤖 Interpretar com IA
+      </button>
+    </div>`);
+}
+
+function impTab(t){
+  document.getElementById('imp-img-area').style.display=t==='img'?'block':'none';
+  document.getElementById('imp-txt-area').style.display=t==='txt'?'block':'none';
+  document.getElementById('imp-tab-img').classList.toggle('on',t==='img');
+  document.getElementById('imp-tab-txt').classList.toggle('on',t==='txt');
+}
+
+function impPreview(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    document.getElementById('imp-prev-area').innerHTML=
+      `<img src="${e.target.result}" style="width:100%;border-radius:9px;margin-top:10px;max-height:200px;object-fit:contain">`;
+  };
+  r.readAsDataURL(file);
+}
+
+async function impProcessar(){
+  const key=GEMINI_KEY||DB.gk();
+  if(!key){alert('Configure a chave do Gemini primeiro.');return;}
+
+  const btn=document.getElementById('imp-btn');
+  btn.textContent='⏳ Interpretando...';btn.disabled=true;
+
+  const prompt=`Você é um assistente que lê mensagens de aplicativos escolares e extrai informações estruturadas.
+Analise esta mensagem e retorne SOMENTE um JSON válido, sem markdown, sem explicações, com estes campos:
+{
+  "titulo": "título curto e descritivo da mensagem (máximo 80 chars)",
+  "filho": "Iza ou Israel ou Ambos (baseado no contexto, default Ambos)",
+  "etiqueta": "uma das opções: Faltou/Dever, Material incomp, Biblioteca, Atividade Aval., Calendário, Atraso, Convite, Material Apoio, Notificação, Uso de celular, Lembrete, Sem uniforme, Trab. sem fazer, Conteúdo Prova, Ocorrência, Trabalho, Dever não feito, Importante, Comunicado, Rotina, Urgente, Notícias, Dever de casa, Outros",
+  "remetente": "nome do remetente se identificável, senão vazio",
+  "data": "data no formato YYYY-MM-DD se mencionada, senão vazio",
+  "conteudo": "resumo claro e completo da mensagem, preservando informações importantes como datas, valores, instruções"
+}`;
+
+  try {
+    let body;
+    const fileInput=document.getElementById('imp-file');
+    const hasImg=fileInput&&fileInput.files.length>0;
+    const txtEl=document.getElementById('imp-txt');
+    const txt=txtEl&&txtEl.style.display!=='none'?txtEl.value.trim():'';
+
+    if(hasImg&&!txt){
+      // Modo imagem
+      const file=fileInput.files[0];
+      const b64=await new Promise(res=>{
+        const r=new FileReader();
+        r.onload=e=>res(e.target.result.split(',')[1]);
+        r.readAsDataURL(file);
+      });
+      body={contents:[{parts:[
+        {text:prompt},
+        {inline_data:{mime_type:file.type,data:b64}}
+      ]}]};
+    } else if(txt){
+      // Modo texto
+      body={contents:[{parts:[{text:prompt+'\n\nMensagem:\n'+txt}]}]};
+    } else {
+      alert('Selecione uma imagem ou cole o texto da mensagem.');
+      btn.textContent='🤖 Interpretar com IA';btn.disabled=false;
+      return;
+    }
+
+    const res=await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key,
+      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}
+    );
+    if(!res.ok) throw new Error('Gemini HTTP '+res.status);
+    const data=await res.json();
+    const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+
+    // Mostra resultado editável
+    document.getElementById('imp-result').innerHTML=`
+      <div style="background:var(--grnl);border:1.5px solid var(--grnb);border-radius:12px;padding:14px;margin-bottom:4px">
+        <div style="font-weight:900;font-size:13px;color:var(--grn);margin-bottom:10px">✅ IA interpretou — revise e confirme:</div>
+        <div class="fi" style="margin-bottom:10px"><label>Título</label><input id="r-titulo" value="${(parsed.titulo||'').replace(/"/g,'&quot;')}" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:14px;background:#fff;font-family:inherit"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="fi" style="margin:0"><label>Filho</label><select id="r-filho" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit;-webkit-appearance:none">${['Iza','Israel','Ambos'].map(n=>`<option${(parsed.filho||'Ambos')===n?' selected':''}>${n}</option>`).join('')}</select></div>
+          <div class="fi" style="margin:0"><label>Etiqueta</label><select id="r-etiq" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit;-webkit-appearance:none">${ETIQUETAS.map(e=>`<option${(parsed.etiqueta||'Comunicado')===e?' selected':''}>${e}</option>`).join('')}</select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="fi" style="margin:0"><label>Remetente</label><input id="r-rem" value="${(parsed.remetente||'').replace(/"/g,'&quot;')}" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit"></div>
+          <div class="fi" style="margin:0"><label>Data</label><input type="date" id="r-data" value="${parsed.data||''}" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit"></div>
+        </div>
+        <div class="fi" style="margin:0"><label>Conteúdo</label><textarea id="r-cont" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit;min-height:80px;resize:vertical">${parsed.conteudo||''}</textarea></div>
+      </div>
+      <button onclick="impSalvar()" class="btn bp" style="width:100%;margin-top:4px">💾 Salvar comunicado</button>`;
+
+    // Armazena imagem para salvar junto
+    if(hasImg) window._impImg=document.querySelector('#imp-prev-area img')?.src||'';
+    else window._impImg='';
+
+  } catch(e){
+    document.getElementById('imp-result').innerHTML=
+      `<div style="background:var(--redl);border:1.5px solid var(--redb);border-radius:10px;padding:12px;font-size:13px;color:var(--red);font-weight:700">
+        ❌ Erro: ${e.message}<br><span style="font-weight:400;margin-top:4px;display:block">Verifique se a chave do Gemini está correta.</span></div>`;
+  }
+  btn.textContent='🤖 Interpretar com IA';btn.disabled=false;
+}
+
+function impSalvar(){
+  const titulo=document.getElementById('r-titulo')?.value.trim();
+  if(!titulo){alert('Título obrigatório.');return;}
+  const com={
+    id:uid(),titulo,
+    filho:document.getElementById('r-filho').value,
+    etiqueta:document.getElementById('r-etiq').value,
+    remetente:document.getElementById('r-rem').value.trim(),
+    conteudo:document.getElementById('r-cont').value.trim(),
+    data:document.getElementById('r-data').value,
+    fixado:false,
+    imagem:window._impImg||'',
+  };
+  S.coms=[...S.coms,com];
+  DB.sc(S.coms);
+  DB.log({type:'add',msg:`Comunicado importado via IA: ${com.titulo}`});
+  S.log=DB.gl();
+  closeAll();
+  go('comunicados');
+  if(_sheetsUrl()) syncComToSheets();
+}
+
+function _renderGeminiSetup(){
+  const cur=GEMINI_KEY||DB.gk();
+  _mo(`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-weight:900;font-size:18px">🤖 Chave do Gemini</span>
+      <button onclick="closeAll()" style="font-size:22px;color:var(--t3);padding:4px 8px;border-radius:9px">✕</button>
+    </div>
+    <div style="background:var(--purl);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--pur);line-height:1.7">
+      <strong>Como obter a chave gratuita:</strong><br>
+      1. Acesse <strong>aistudio.google.com</strong><br>
+      2. Clique em <strong>Get API Key → Create API key</strong><br>
+      3. Copie o código (começa com AIza...)<br>
+      4. Cole abaixo e salve
+    </div>
+    <div class="fi"><label>Chave de API do Gemini</label>
+      <input id="gem-key" value="${cur}" placeholder="AIzaSy..." type="password"
+        style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:11px 13px;font-size:14px;background:var(--bg);font-family:inherit;outline:none"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeAll()" class="btn bs" style="flex:1">Cancelar</button>
+      <button onclick="salvarGeminiKey()" class="btn" style="flex:2;background:var(--pur);color:#fff;font-weight:800">Salvar chave</button>
+    </div>`);
+}
+
+function salvarGeminiKey(){
+  const k=document.getElementById('gem-key').value.trim();
+  if(!k){alert('Cole a chave do Gemini.');return;}
+  DB.sk(k);
+  closeAll();
+  render();
+  alert('✅ Chave salva! Agora você pode importar mensagens com IA.');
+}
+
+async function syncComToSheets(){
+  const url=_sheetsUrl(); if(!url) return;
+  try{ await _getSync(url,'setComs',S.coms); }catch(e){ console.warn('Com sync failed:',e.message); }
+}
+
 // ══ SYNC COM SHEETS ══════════════════════════════════
 const _sheetsUrl=()=>SHEETS_URL||localStorage.getItem('mx4_sheetsUrl')||'';
 
@@ -914,7 +1309,59 @@ async function checkUpdate(){
   alert('Verificação concluída. Se houver atualização, um aviso aparecerá no topo.');
 }
 
+// ══ SHARE TARGET (Android) ═══════════════════════════
+// Detecta quando o app é aberto via share sheet com uma imagem
+async function handleShareTarget(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.has('share') && params.get('share')==='image'){
+    // Busca o arquivo compartilhado via Cache API
+    const cache=await caches.open('share-target');
+    const keys=await cache.keys();
+    if(keys.length){
+      const res=await cache.match(keys[0]);
+      const blob=await res.blob();
+      const b64=await new Promise(ok=>{
+        const r=new FileReader();
+        r.onload=e=>ok(e.target.result);
+        r.readAsDataURL(blob);
+      });
+      await cache.delete(keys[0]);
+      // Abre import form com a imagem já carregada
+      setTimeout(()=>{
+        openComImport();
+        setTimeout(()=>{
+          window._impImg=b64;
+          const prev=document.getElementById('imp-prev-area');
+          if(prev) prev.innerHTML=`<img src="${b64}" style="width:100%;border-radius:9px;margin-top:10px;max-height:200px;object-fit:contain">`;
+        },200);
+      },300);
+    }
+    // Limpa o parâmetro da URL sem recarregar
+    window.history.replaceState({},'','/maximus-agenda/');
+  }
+}
+
+// Inclui comunicados no sync
+const _origSyncSheets = syncSheets;
+async function syncSheetsCompleto(){
+  await _origSyncSheets();
+  // Sync adicional para comunicados
+  const url=_sheetsUrl(); if(!url) return;
+  try{
+    const res=await fetch(url+'?action=get');
+    const data=await res.json();
+    if(data.coms){
+      const sheetsIds=new Set(data.coms.map(c=>c.id));
+      const localOnly=S.coms.filter(c=>c.id&&!sheetsIds.has(c.id));
+      S.coms=[...data.coms,...localOnly];
+      DB.sc(S.coms);
+    }
+    await syncComToSheets();
+  }catch(e){ console.warn('Coms sync failed:',e.message); }
+}
+
 init();
+handleShareTarget();
 </script>
 </body>
 </html>
