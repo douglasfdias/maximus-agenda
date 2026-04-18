@@ -1040,16 +1040,51 @@ async function impProcessar(){
   const btn=document.getElementById('imp-btn');
   btn.textContent='⏳ Interpretando...';btn.disabled=true;
 
-  const prompt=`Você é um assistente que lê mensagens de aplicativos escolares e extrai informações estruturadas.
-Analise esta mensagem e retorne SOMENTE um JSON válido, sem markdown, sem explicações, com estes campos:
+  // Mapeamento de professores/coordenadores → filho
+  const PROFESSORES=`
+Professores e coordenadoras do Israel (2º ano): Ísis Fernandes Canuto, José Antônio de Souza
+Coordenadoras gerais da escola (ambos): Flávia Alves Noronha, Juliana Proença Simão Piló
+Coordenadora da Iza (6º ano): Bruna Oliveira Soares
+Todos os outros professores não listados acima são da Iza (6º ano).`;
+
+  const MATERIAS_IZA='Matemática, Português, Ciências, História, Geografia, Inglês, Arte, Ed. Física, Religião';
+  const MATERIAS_ISRAEL='Matemática, Português, Ciências, História, Geografia, Arte, Ed. Física, Religião';
+
+  const prompt=`Você é um assistente que analisa mensagens de aplicativos escolares brasileiros e extrai informações estruturadas.
+
+CONTEXTO DA ESCOLA:
+${PROFESSORES}
+
+Matérias da Iza (6º ano): ${MATERIAS_IZA}
+Matérias do Israel (2º ano): ${MATERIAS_ISRAEL}
+
+TAREFA:
+Analise a mensagem e retorne SOMENTE um array JSON válido, sem markdown, sem texto adicional.
+Extraia TODOS os itens distintos da mensagem. Uma mensagem pode conter múltiplos itens (ex: para casa de Geografia E para casa de História são dois itens separados).
+
+Para cada item, retorne um objeto com:
 {
-  "titulo": "título curto e descritivo da mensagem (máximo 80 chars)",
-  "filho": "Iza ou Israel ou Ambos (baseado no contexto, default Ambos)",
-  "etiqueta": "uma das opções: Faltou/Dever, Material incomp, Biblioteca, Atividade Aval., Calendário, Atraso, Convite, Material Apoio, Notificação, Uso de celular, Lembrete, Sem uniforme, Trab. sem fazer, Conteúdo Prova, Ocorrência, Trabalho, Dever não feito, Importante, Comunicado, Rotina, Urgente, Notícias, Dever de casa, Outros",
-  "remetente": "nome do remetente se identificável, senão vazio",
-  "data": "data no formato YYYY-MM-DD se mencionada, senão vazio",
-  "conteudo": "resumo claro e completo da mensagem, preservando informações importantes como datas, valores, instruções"
-}`;
+  "titulo": "título curto e descritivo (máx 80 chars)",
+  "tipo": "tarefa | prova | conteudo | material | evento | reuniao | comunicado",
+  "precisa_status": true ou false (true se exige ação/entrega; false se é só informativo),
+  "filho": "Iza | Israel | Ambos | Indefinido",
+  "filho_motivo": "breve justificativa (ex: professor é da Iza, matéria é do 6º ano)",
+  "materia": "Matemática | Português | Ciências | História | Geografia | Inglês | Arte | Ed. Física | Religião | Geral",
+  "bimestre": "1º Bimestre | 2º Bimestre | 3º Bimestre | 4º Bimestre | (vazio se não mencionado)",
+  "data": "YYYY-MM-DD se houver data/prazo, senão vazio. Ano atual: ${new Date().getFullYear()}",
+  "tipo_data": "prazo | evento | (vazio)",
+  "descricao": "detalhes relevantes: páginas, instruções, materiais, valores, etc.",
+  "remetente": "nome do remetente se identificável",
+  "etiqueta": "uma das etiquetas: Faltou/Dever | Material incomp | Biblioteca | Atividade Aval. | Calendário | Atraso | Convite | Material Apoio | Notificação | Uso de celular | Lembrete | Sem uniforme | Trab. sem fazer | Conteúdo Prova | Ocorrência | Trabalho | Dever não feito | Importante | Comunicado | Rotina | Urgente | Notícias | Dever de casa | Outros"
+}
+
+REGRAS:
+- Se uma mensagem tem para casa de 2 matérias diferentes, crie 2 itens separados
+- Se menciona prova E conteúdo da prova, crie 2 itens (um tipo "prova" com a data, outro tipo "conteudo" com o que vai cair)
+- "precisa_status" = true para: tarefas, provas, materiais a trazer, trabalhos
+- "precisa_status" = false para: comunicados informativos, reuniões de pais (sem ação das crianças), eventos sem preparação necessária
+- Se não conseguir determinar o filho pela mensagem, use "Indefinido"
+- Para datas relativas como "semana que vem" ou "próxima quinta", calcule a data real a partir de hoje (${new Date().toLocaleDateString('pt-BR')})`;
 
   try {
     let body;
@@ -1059,19 +1094,14 @@ Analise esta mensagem e retorne SOMENTE um JSON válido, sem markdown, sem expli
     const txt=txtEl&&txtEl.style.display!=='none'?txtEl.value.trim():'';
 
     if(hasImg&&!txt){
-      // Modo imagem
       const file=fileInput.files[0];
       const b64=await new Promise(res=>{
         const r=new FileReader();
         r.onload=e=>res(e.target.result.split(',')[1]);
         r.readAsDataURL(file);
       });
-      body={contents:[{parts:[
-        {text:prompt},
-        {inline_data:{mime_type:file.type,data:b64}}
-      ]}]};
+      body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:file.type,data:b64}}]}]};
     } else if(txt){
-      // Modo texto
       body={contents:[{parts:[{text:prompt+'\n\nMensagem:\n'+txt}]}]};
     } else {
       alert('Selecione uma imagem ou cole o texto da mensagem.');
@@ -1087,57 +1117,144 @@ Analise esta mensagem e retorne SOMENTE um JSON válido, sem markdown, sem expli
     const data=await res.json();
     const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
     const clean=raw.replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(clean);
+    let parsed=JSON.parse(clean);
+    if(!Array.isArray(parsed)) parsed=[parsed];
 
-    // Mostra resultado editável
-    document.getElementById('imp-result').innerHTML=`
-      <div style="background:var(--grnl);border:1.5px solid var(--grnb);border-radius:12px;padding:14px;margin-bottom:4px">
-        <div style="font-weight:900;font-size:13px;color:var(--grn);margin-bottom:10px">✅ IA interpretou — revise e confirme:</div>
-        <div class="fi" style="margin-bottom:10px"><label>Título</label><input id="r-titulo" value="${(parsed.titulo||'').replace(/"/g,'&quot;')}" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:14px;background:#fff;font-family:inherit"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div class="fi" style="margin:0"><label>Filho</label><select id="r-filho" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit;-webkit-appearance:none">${['Iza','Israel','Ambos'].map(n=>`<option${(parsed.filho||'Ambos')===n?' selected':''}>${n}</option>`).join('')}</select></div>
-          <div class="fi" style="margin:0"><label>Etiqueta</label><select id="r-etiq" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit;-webkit-appearance:none">${ETIQUETAS.map(e=>`<option${(parsed.etiqueta||'Comunicado')===e?' selected':''}>${e}</option>`).join('')}</select></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div class="fi" style="margin:0"><label>Remetente</label><input id="r-rem" value="${(parsed.remetente||'').replace(/"/g,'&quot;')}" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit"></div>
-          <div class="fi" style="margin:0"><label>Data</label><input type="date" id="r-data" value="${parsed.data||''}" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit"></div>
-        </div>
-        <div class="fi" style="margin:0"><label>Conteúdo</label><textarea id="r-cont" style="width:100%;border:2px solid var(--border);border-radius:var(--rs);padding:9px 12px;font-size:13px;background:#fff;font-family:inherit;min-height:80px;resize:vertical">${parsed.conteudo||''}</textarea></div>
-      </div>
-      <button onclick="impSalvar()" class="btn bp" style="width:100%;margin-top:4px">💾 Salvar comunicado</button>`;
+    // Guarda imagem se houver
+    window._impImg=hasImg?(document.querySelector('#imp-prev-area img')?.src||''):'';
 
-    // Armazena imagem para salvar junto
-    if(hasImg) window._impImg=document.querySelector('#imp-prev-area img')?.src||'';
-    else window._impImg='';
+    // Mostra tela de revisão
+    _renderRevisao(parsed);
 
   } catch(e){
     document.getElementById('imp-result').innerHTML=
       `<div style="background:var(--redl);border:1.5px solid var(--redb);border-radius:10px;padding:12px;font-size:13px;color:var(--red);font-weight:700">
-        ❌ Erro: ${e.message}<br><span style="font-weight:400;margin-top:4px;display:block">Verifique se a chave do Gemini está correta.</span></div>`;
+        ❌ Erro: ${e.message}</div>`;
   }
   btn.textContent='🤖 Interpretar com IA';btn.disabled=false;
 }
 
-function impSalvar(){
-  const titulo=document.getElementById('r-titulo')?.value.trim();
-  if(!titulo){alert('Título obrigatório.');return;}
-  const com={
-    id:uid(),titulo,
-    filho:document.getElementById('r-filho').value,
-    etiqueta:document.getElementById('r-etiq').value,
-    remetente:document.getElementById('r-rem').value.trim(),
-    conteudo:document.getElementById('r-cont').value.trim(),
-    data:document.getElementById('r-data').value,
-    fixado:false,
-    imagem:window._impImg||'',
-  };
-  S.coms=[...S.coms,com];
-  DB.sc(S.coms);
-  DB.log({type:'add',msg:`Comunicado importado via IA: ${com.titulo}`});
+function _renderRevisao(itens){
+  const res=document.getElementById('imp-result');
+  if(!res) return;
+
+  const fs=(id,v,opts,label)=>`<div style="flex:1;min-width:0">
+    <div style="font-size:10px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">${label}</div>
+    <select id="${id}" style="width:100%;border:2px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;font-family:inherit;-webkit-appearance:none">
+      ${opts.map(o=>`<option${o===v?' selected':''}>${o}</option>`).join('')}
+    </select></div>`;
+
+  const fi=(id,v,ph,label)=>`<div style="flex:1;min-width:0">
+    <div style="font-size:10px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">${label}</div>
+    <input id="${id}" value="${(v||'').replace(/"/g,'&quot;')}" placeholder="${ph}"
+      style="width:100%;border:2px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;font-family:inherit"></div>`;
+
+  const TIPOS_VALS=['tarefa','prova','conteudo','material','evento','reuniao','comunicado'];
+  const MAT_VALS=['Matemática','Português','Ciências','História','Geografia','Inglês','Arte','Ed. Física','Religião','Geral'];
+  const BIM_VALS=['','1º Bimestre','2º Bimestre','3º Bimestre','4º Bimestre'];
+
+  let html=`<div style="background:var(--grnl);border:1.5px solid var(--grnb);border-radius:12px;padding:12px;margin-bottom:8px">
+    <div style="font-weight:900;font-size:13px;color:var(--grn);margin-bottom:2px">✅ ${itens.length} item(s) identificado(s) — revise e confirme</div>
+    <div style="font-size:11px;color:var(--t2)">Ajuste o que precisar antes de salvar</div>
+  </div>`;
+
+  itens.forEach((it,i)=>{
+    const filhoSug=it.filho==='Indefinido'?'Ambos':it.filho;
+    const mc=MAT_COR[it.materia]||MAT_COR['Geral'];
+    html+=`<div style="border:2px solid ${mc.b};border-radius:12px;margin-bottom:12px;overflow:hidden">
+      <div style="background:${mc.bg};padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1.5px solid ${mc.b}">
+        <span style="font-weight:900;font-size:12px;color:${mc.c};flex:1">${it.materia||'Geral'} · item ${i+1}</span>
+        ${it.filho_motivo?`<span style="font-size:10px;color:var(--t2);font-style:italic">${it.filho_motivo}</span>`:''}
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--t2);cursor:pointer">
+          <input type="checkbox" id="ri-status-${i}" ${it.precisa_status?' checked':''} style="accent-color:var(--accent)"> Com status
+        </label>
+      </div>
+      <div style="padding:12px;display:grid;gap:10px">
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Título</div>
+          <input id="ri-titulo-${i}" value="${(it.titulo||'').replace(/"/g,'&quot;')}"
+            style="width:100%;border:2px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-weight:700;background:#fff;font-family:inherit">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${fs(`ri-filho-${i}`,filhoSug,['Iza','Israel','Ambos'],'Para quem *')}
+          ${fs(`ri-tipo-${i}`,it.tipo||'tarefa',TIPOS_VALS,'Tipo')}
+          ${fs(`ri-mat-${i}`,it.materia||'Geral',MAT_VALS,'Matéria')}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${fs(`ri-bim-${i}`,it.bimestre||'',BIM_VALS,'Bimestre')}
+          ${fi(`ri-data-${i}`,it.data,'','Data (AAAA-MM-DD)')}
+          ${fi(`ri-rem-${i}`,it.remetente||'','Ex: Prof. João','Remetente')}
+        </div>
+        ${it.descricao?`<div>
+          <div style="font-size:10px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Descrição</div>
+          <textarea id="ri-desc-${i}" style="width:100%;border:2px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;font-family:inherit;min-height:60px;resize:vertical">${it.descricao}</textarea>
+        </div>`:`<input type="hidden" id="ri-desc-${i}" value="">`}
+        <button onclick="_removerItem(${i})" style="background:none;border:none;font-size:12px;color:var(--t3);cursor:pointer;text-align:left;font-family:inherit;font-weight:700">🗑️ Remover este item</button>
+      </div>
+    </div>`;
+  });
+
+  html+=`<button onclick="_salvarTodos(${itens.length})" class="btn bp" style="width:100%">
+    💾 Salvar ${itens.length} item(s)
+  </button>`;
+
+  res.innerHTML=html;
+  window._impCount=itens.length;
+}
+
+function _removerItem(idx){
+  const el=document.getElementById(`ri-titulo-${idx}`)?.closest('div[style*="border:2px solid"]');
+  if(el){el.style.opacity='0.3';el.style.pointerEvents='none';el.dataset.removido='true';}
+}
+
+function _salvarTodos(total){
+  let salvos=0;
+  for(let i=0;i<total;i++){
+    const container=document.getElementById(`ri-titulo-${i}`)?.closest('div[style*="border:2px solid"]');
+    if(container?.dataset.removido==='true') continue;
+
+    const titulo=(document.getElementById(`ri-titulo-${i}`)?.value||'').trim();
+    if(!titulo) continue;
+
+    const filho=document.getElementById(`ri-filho-${i}`)?.value||'Ambos';
+    const tipo=document.getElementById(`ri-tipo-${i}`)?.value||'tarefa';
+    const materia=document.getElementById(`ri-mat-${i}`)?.value||'Geral';
+    const bimestre=document.getElementById(`ri-bim-${i}`)?.value||'';
+    const dataVenc=document.getElementById(`ri-data-${i}`)?.value||'';
+    const remetente=document.getElementById(`ri-rem-${i}`)?.value||'';
+    const descricao=document.getElementById(`ri-desc-${i}`)?.value||'';
+    const comStatus=document.getElementById(`ri-status-${i}`)?.checked;
+
+    if(comStatus){
+      // Salva como tarefa/item (com status)
+      const item={id:uid(),titulo,filho,tipo,materia,bimestre,descricao,dataVenc,status:'aberto'};
+      S.items=[...S.items,item];
+      DB.si(S.items);
+      DB.log({type:'add',msg:`IA → Tarefa: ${titulo} (${filho} · ${materia})`});
+    } else {
+      // Salva como comunicado (sem status)
+      const com={id:uid(),titulo,filho,
+        etiqueta:tipo==='reuniao'?'Comunicado':tipo==='evento'?'Calendário':'Comunicado',
+        remetente,conteudo:descricao,data:dataVenc,fixado:false,
+        imagem:salvos===0?(window._impImg||''):'',
+      };
+      S.coms=[...S.coms,com];
+      DB.sc(S.coms);
+      DB.log({type:'add',msg:`IA → Comunicado: ${titulo}`});
+    }
+    salvos++;
+  }
+
   S.log=DB.gl();
+  if(_sheetsUrl()){syncToSheets();syncComToSheets();}
   closeAll();
-  go('comunicados');
-  if(_sheetsUrl()) syncComToSheets();
+  if(salvos>0){
+    updateBadge();
+    // Vai para a tela mais relevante
+    const temTarefas=S.items.some(i=>i.status==='aberto');
+    go(temTarefas?'dashboard':'comunicados');
+    setTimeout(()=>alert(`✅ ${salvos} item(s) salvo(s)!`),100);
+  }
 }
 
 function _renderGeminiSetup(){
