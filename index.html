@@ -158,7 +158,8 @@ input,select,textarea{font-family:inherit}
 <script>
 // ══ CONSTANTS ══════════════════════════════════════
 // Cole aqui a URL do seu Google Apps Script Web App (após configurar):
-const SHEETS_URL = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
+const SHEETS_URL   = 'https://script.google.com/macros/s/AKfycbz6xUTGCrUvTK617km2aNzJJ_akVrTKugqOTe-TaphuDZnDaK3nRFTDu-SlNVZLRVnu0Q/exec';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
+const SHEETS_TOKEN = 'dias-120401';  // A mesma senha definida no SHEETS_TOKEN do Code.gs
 
 // Chave de API do Gemini (gratuita em aistudio.google.com):
 const GEMINI_KEY = '';  // Ex: 'AIzaSy...'
@@ -885,6 +886,9 @@ function _renderSyncSetup(){
     </div>
     <div class="fi"><label>URL do Apps Script Web App</label>
       <input id="sync-url" value="${SHEETS_URL}" placeholder="https://script.google.com/macros/s/..."></div>
+    <div class="fi"><label>Token de segurança</label>
+      <input id="sync-token" type="password" value="${SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||''}"
+        placeholder="A senha definida no SHEETS_TOKEN do Code.gs"></div>
     <div style="display:flex;gap:10px">
       <button onclick="closeAll()" class="btn bs" style="flex:1">Cancelar</button>
       <button onclick="_saveSyncUrl()" class="btn bg2" style="flex:2">Salvar e testar</button>
@@ -893,12 +897,13 @@ function _renderSyncSetup(){
 
 function _saveSyncUrl(){
   const url=document.getElementById('sync-url').value.trim();
-  if(!url){closeAll();return}
-  // Salva no HTML em memória — para persistir precisaria editar o arquivo
-  // Por agora instrui o usuário a editar a constante SHEETS_URL diretamente
+  const tok=document.getElementById('sync-token')?.value.trim()||'';
+  if(!url){closeAll();return;}
   localStorage.setItem('mx4_sheetsUrl',url);
+  if(tok) localStorage.setItem('mx4_sheetsToken',tok);
   closeAll();
-  alert('URL salva! Para tornar permanente, edite a constante SHEETS_URL no início do index.html e faça o upload novamente para o GitHub.');
+  render();
+  alert('Configuração salva!\n\nPara tornar permanente, edite as constantes SHEETS_URL e SHEETS_TOKEN no início do index.html e faça upload no GitHub.');
 }
 
 // ══ COMUNICADOS — FORMULÁRIOS ════════════════════════
@@ -1298,7 +1303,8 @@ async function syncSheets(){
   S.syncing=true;renderHdr();
   try{
     // 1. Busca dados da planilha
-    const res=await fetch(url+'?action=get');
+    const tok=SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||'';
+    const res=await fetch(url+'?action=get&token='+encodeURIComponent(tok));
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'Erro desconhecido');
@@ -1363,7 +1369,8 @@ async function _postToSheets(url){
 async function _getSync(url, action, data){
   const json = JSON.stringify(data);
   const b64  = btoa(unescape(encodeURIComponent(json)));
-  const res  = await fetch(url + '?action=' + action + '&data=' + encodeURIComponent(b64));
+  const tok  = SHEETS_TOKEN || localStorage.getItem('mx4_sheetsToken') || '';
+  const res  = await fetch(url + '?action=' + action + '&token=' + encodeURIComponent(tok) + '&data=' + encodeURIComponent(b64));
   try {
     const r = await res.json();
     if (r && r.ok === false) console.warn('Sheets error:', r.error);
