@@ -348,10 +348,14 @@ function renderHdr(){
         </button>`;
       }).join('')}
     </div>
-    ${SHEETS_URL?`<button onclick="syncSheets()" title="Sincronizar com Google Sheets"
+    <button onclick="syncSheets()" title="Sincronizar com Google Sheets"
       style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:7px 9px;font-size:16px;cursor:pointer;${S.syncing?'opacity:.5':''}">
       ${S.syncing?'⏳':'🔄'}
-    </button>`:''}`;
+    </button>
+    <button onclick="openSyncSetup()" title="Configurações"
+      style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:7px 9px;font-size:16px;cursor:pointer">
+      ⚙️
+    </button>`;
 }
 
 function setFilho(f){S.filho=f;renderHdr();render();}
