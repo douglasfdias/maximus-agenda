@@ -195,13 +195,15 @@ const MAT_COR={
 const gMC=m=>MAT_COR[m]||MAT_COR['Geral'];
 
 const TIPOS=[
-  {v:'tarefa',   l:'Para casa',      e:'📝',bg:'var(--isrl)',c:'var(--isr)',b:'var(--isrb)'},
-  {v:'prova',    l:'Prova',          e:'📋',bg:'var(--redl)',c:'var(--red)',b:'var(--redb)'},
-  {v:'conteudo', l:'Conteúdo prova', e:'📚',bg:'var(--purl)',c:'var(--pur)',b:'var(--purb)'},
-  {v:'material', l:'Material',       e:'🎒',bg:'var(--yell)',c:'var(--yel)',b:'var(--yelb)'},
-  {v:'evento',   l:'Evento',         e:'🎉',bg:'var(--grnl)',c:'var(--grn)',b:'var(--grnb)'},
-  {v:'reuniao',  l:'Reunião',        e:'👥',bg:'#FFF3E0',c:'#BF360C',b:'#FFCC80'},
-  {v:'comunicado',l:'Comunicado',    e:'📢',bg:'#F5F5F5',c:'#424242',b:'#E0E0E0'},
+  {v:'tarefa',    l:'Para casa',       e:'📝',bg:'var(--isrl)',c:'var(--isr)',b:'var(--isrb)'},
+  {v:'prova',     l:'Prova',           e:'📋',bg:'var(--redl)',c:'var(--red)',b:'var(--redb)'},
+  {v:'exercicio', l:'Ex. Avaliativo',  e:'📄',bg:'#FFF3E0',   c:'#E65100',  b:'#FFCC80'},
+  {v:'conteudo',  l:'Conteúdo prova',  e:'📚',bg:'var(--purl)',c:'var(--pur)',b:'var(--purb)'},
+  {v:'material',  l:'Material',        e:'🎒',bg:'var(--yell)',c:'var(--yel)',b:'var(--yelb)'},
+  {v:'trabalho',  l:'Trabalho',        e:'📁',bg:'#E8EAF6',   c:'#283593',  b:'#9FA8DA'},
+  {v:'evento',    l:'Evento',          e:'🎉',bg:'var(--grnl)',c:'var(--grn)',b:'var(--grnb)'},
+  {v:'reuniao',   l:'Reunião',         e:'👥',bg:'#FFF3E0',   c:'#BF360C',  b:'#FFCC80'},
+  {v:'comunicado',l:'Comunicado',      e:'📢',bg:'#F5F5F5',   c:'#424242',  b:'#E0E0E0'},
 ];
 const ST=[
   {v:'aberto',   l:'Em Aberto',  s:'Aberto',  dot:'#9E9E9E',bg:'#F5F5F5',c:'#424242',i:'○'},
@@ -773,6 +775,7 @@ function _saveItem(id,isE){
     descricao:document.getElementById('f-desc').value.trim(),
     dataVenc:document.getElementById('f-data').value,
     status:document.getElementById('f-st').value,
+    origem:isE?(S.items.find(i=>i.id===id)?.origem||'app'):'app',
   };
   if(isE) S.items=S.items.map(i=>i.id===id?item:i);
   else S.items=[...S.items,item];
@@ -820,7 +823,7 @@ function _processBulk(){
     const filho=['Iza','Israel','Ambos'].find(f=>f.toLowerCase()===(p[1]||'').toLowerCase())||'Iza';
     const materia=MAT.find(m=>m.toLowerCase().includes((p[2]||'').toLowerCase().slice(0,4)))||'Geral';
     const tipo=TIPOS.find(t=>t.v===(p[4]||'').toLowerCase()||t.l.toLowerCase().includes((p[4]||'').toLowerCase()))?.v||'tarefa';
-    S.items.push({id:uid(),titulo:p[0],filho,materia,tipo,bimestre:'',descricao:'',dataVenc:dv,status:'aberto'});
+    S.items.push({id:uid(),titulo:p[0],filho,materia,tipo,bimestre:'',descricao:'',dataVenc:dv,status:'aberto',origem:'app'});
     added++;
   });
   DB.si(S.items);
@@ -966,6 +969,7 @@ function _saveCom(id, isE){
       data:document.getElementById('cf-data').value,
       fixado:document.getElementById('cf-fix').checked,
       imagem:imgData||(isE?S.coms.find(c=>c.id===id)?.imagem||'':''),
+      origem:isE?(S.coms.find(c=>c.id===id)?.origem||'app'):'app',
     };
     if(isE) S.coms=S.coms.map(c=>c.id===id?com:c);
     else S.coms=[...S.coms,com];
@@ -1232,16 +1236,20 @@ function _salvarTodos(total){
 
     if(comStatus){
       // Salva como tarefa/item (com status)
-      const item={id:uid(),titulo,filho,tipo,materia,bimestre,descricao,dataVenc,status:'aberto'};
+      const imgSrc=salvos===0?(window._impImg||''):'';
+      const origType=imgSrc?'ia-imagem':'ia-texto';
+      const item={id:uid(),titulo,filho,tipo,materia,bimestre,descricao,dataVenc,status:'aberto',origem:origType};
       S.items=[...S.items,item];
       DB.si(S.items);
       DB.log({type:'add',msg:`IA → Tarefa: ${titulo} (${filho} · ${materia})`});
     } else {
       // Salva como comunicado (sem status)
+      const imgSrc2=salvos===0?(window._impImg||''):'';
+      const origType2=imgSrc2?'ia-imagem':'ia-texto';
       const com={id:uid(),titulo,filho,
         etiqueta:tipo==='reuniao'?'Comunicado':tipo==='evento'?'Calendário':'Comunicado',
         remetente,conteudo:descricao,data:dataVenc,fixado:false,
-        imagem:salvos===0?(window._impImg||''):'',
+        imagem:imgSrc2,origem:origType2,
       };
       S.coms=[...S.coms,com];
       DB.sc(S.coms);
