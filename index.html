@@ -158,8 +158,8 @@ input,select,textarea{font-family:inherit}
 <script>
 // ══ CONSTANTS ══════════════════════════════════════
 // Cole aqui a URL do seu Google Apps Script Web App (após configurar):
-const SHEETS_URL   = 'https://script.google.com/macros/s/AKfycbz6xUTGCrUvTK617km2aNzJJ_akVrTKugqOTe-TaphuDZnDaK3nRFTDu-SlNVZLRVnu0Q/exec';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
-const SHEETS_TOKEN = 'dias-120401';  // A mesma senha definida no SHEETS_TOKEN do Code.gs
+const SHEETS_URL   = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
+const SHEETS_TOKEN = '';  // A mesma senha definida no SHEETS_TOKEN do Code.gs
 
 // Chave de API do Gemini (gratuita em aistudio.google.com):
 const GEMINI_KEY = '';  // Ex: 'AIzaSy...'
@@ -1312,7 +1312,7 @@ async function syncSheets(){
   try{
     // 1. Busca dados da planilha
     const tok=SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||'';
-    const res=await fetch(url+'?action=get&token='+encodeURIComponent(tok));
+    const res=await fetch(url+'?action=get&token='+encodeURIComponent(tok), {redirect:'follow'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'Erro desconhecido');
@@ -1378,11 +1378,23 @@ async function _getSync(url, action, data){
   const json = JSON.stringify(data);
   const b64  = btoa(unescape(encodeURIComponent(json)));
   const tok  = SHEETS_TOKEN || localStorage.getItem('mx4_sheetsToken') || '';
-  const res  = await fetch(url + '?action=' + action + '&token=' + encodeURIComponent(tok) + '&data=' + encodeURIComponent(b64));
-  try {
-    const r = await res.json();
-    if (r && r.ok === false) console.warn('Sheets error:', r.error);
-  } catch(e) { /* redirect resultou em HTML, ignorar */ }
+  // Operações de escrita usam no-cors — dados chegam ao servidor sem bloqueio CORS
+  // Leitura (action=get) usa fetch normal para receber a resposta JSON
+  if(action === 'get'){
+    const res = await fetch(url + '?action=get&token=' + encodeURIComponent(tok));
+    return res.json();
+  }
+  // Para escrita: chunks de no máximo 200 itens para não exceder limite de URL
+  const CHUNK = 200;
+  const arr = Array.isArray(data) ? data : [data];
+  for(let i = 0; i < arr.length; i += CHUNK){
+    const chunk = arr.slice(i, i + CHUNK);
+    const b64chunk = btoa(unescape(encodeURIComponent(JSON.stringify(chunk))));
+    await fetch(
+      url + '?action=' + action + '&token=' + encodeURIComponent(tok) + '&data=' + encodeURIComponent(b64chunk),
+      { mode: 'no-cors' }  // ignora CORS — suficiente para escrita
+    );
+  }
 }
 
 async function syncComToSheets(){
