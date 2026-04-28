@@ -38,8 +38,8 @@ input,select,textarea{font-family:inherit}
 #hdr{height:var(--hdr-h);background:var(--text);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:100}
 #content{flex:1;overflow-y:auto;padding:14px 14px calc(var(--nav-h) + 14px);-webkit-overflow-scrolling:touch}
 #nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1.5px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom,0);z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,.06)}
-.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 0;color:var(--t3);transition:color .15s;position:relative}
-.nb.on{color:var(--accent)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 0;color:var(--t3);transition:all .15s;position:relative;border-top:2.5px solid transparent}
+.nb.on{color:var(--accent);border-top-color:var(--accent);background:linear-gradient(to bottom,var(--al),transparent)}
 .ni{font-size:20px;line-height:1}
 .nl{font-size:10px;font-weight:800}
 .badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--red);color:#fff;border-radius:99px;padding:1px 5px;font-size:9px;font-weight:900;min-width:16px;text-align:center}
@@ -101,12 +101,14 @@ input,select,textarea{font-family:inherit}
 .cg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .cdn{text-align:center;font-size:10px;font-weight:800;color:var(--t3);padding:4px 0}
 .cd{min-height:46px;border-radius:10px;padding:4px 3px;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);transition:all .15s}
-.cd.sel{border-color:var(--accent);background:var(--al)}
+.cd.sel{border-color:var(--accent);background:var(--accent);box-shadow:0 0 0 3px var(--al)}
+.cd.sel .cn{color:#fff;font-weight:900}
 .cd.tod{background:var(--text);border-color:var(--text)}
 .cd.tod .cn{color:#fff}
 .cn{font-size:12px;font-weight:800;color:var(--text);text-align:center}
 .dots{display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin-top:2px}
 .dot{width:5px;height:5px;border-radius:50%}
+.dot.done{opacity:.3}
 
 /* GRADES */
 .gh{color:var(--grn);font-weight:900}
@@ -231,6 +233,8 @@ const DB={
   sSync(v){localStorage.setItem('mx4_sync',v)},
   gc(){return JSON.parse(localStorage.getItem('mx4_coms')||'[]')},
   sc(v){localStorage.setItem('mx4_coms',JSON.stringify(v))},
+  gMostrarLidos(){return localStorage.getItem('mx4_mostrarLidos')==='true'},
+  sMostrarLidos(v){localStorage.setItem('mx4_mostrarLidos',v?'true':'false')},
   gk(){return localStorage.getItem('mx4_gemini')||''},
   sk(v){localStorage.setItem('mx4_gemini',v)},
 };
@@ -375,50 +379,145 @@ function updateBadge(){
 // ══ DASHBOARD ════════════════════════════════════════
 function renderDash(){
   const all=fi(S.items);
-  const pend=all.filter(i=>i.status!=='concluido');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const todayStr=today.toISOString().split('T')[0];
+  const n3=new Date(today); n3.setDate(n3.getDate()+3);
+  const n7=new Date(today); n7.setDate(n7.getDate()+7);
+
   const ovd=all.filter(i=>ov(i.dataVenc,i.status));
-  const ent=all.filter(i=>i.status==='entrega');
+  const hj =all.filter(i=>i.dataVenc===todayStr&&i.status!=='concluido');
+  const p3 =all.filter(i=>{
+    if(!i.dataVenc||i.status==='concluido'||ov(i.dataVenc,i.status)||i.dataVenc===todayStr) return false;
+    const d=new Date(i.dataVenc+'T00:00:00'); return d>today&&d<=n3;
+  });
+  const p7 =all.filter(i=>{
+    if(!i.dataVenc||i.status==='concluido'||ov(i.dataVenc,i.status)||i.dataVenc===todayStr) return false;
+    const d=new Date(i.dataVenc+'T00:00:00'); return d>n3&&d<=n7;
+  });
   const pvs=all.filter(i=>i.tipo==='prova'&&i.status!=='concluido');
-  const n7=new Date();n7.setDate(n7.getDate()+7);
-  const prox=all.filter(i=>i.dataVenc&&new Date(i.dataVenc+'T23:59:59')<=n7&&!ov(i.dataVenc,i.status)&&i.status!=='concluido');
 
-  const sc=(v,l,c,bg,fn)=>`<div class="sc" style="background:${bg};border-color:${c}25" onclick="${fn}">
-    <div class="sv" style="color:${c}">${v}</div><div class="sl">${l}</div></div>`;
-
-  let h=`<div class="sg">
-    ${sc(pend.length,'Pendentes','#1565C0','#E3F2FD',"go('tarefas')")}
-    ${sc(ent.length,'Ag. Entrega','#E65100','#FFF3E0',"go('avisos')")}
-    ${sc(ovd.length,'Atrasados',ovd.length?'#C62828':'#9E9E9E',ovd.length?'#FFEBEE':'#F5F5F5',"go('tarefas')")}
-    ${sc(pvs.length,'Provas','#6A1B9A','#F3E5F5',"go('calendario')")}
+  // ── stats ──
+  let h=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+    ${[
+      {v:ovd.length,l:'Atrasados',c:ovd.length?'var(--red)':'#9E9E9E',bg:ovd.length?'var(--redl)':'#F5F5F5',bd:ovd.length?'var(--redb)':'#E0E0E0'},
+      {v:hj.length, l:'Hoje',     c:hj.length? 'var(--yel)':'#9E9E9E',bg:hj.length? 'var(--yell)':'#F5F5F5',bd:hj.length? 'var(--yelb)':'#E0E0E0'},
+      {v:p3.length, l:'3 dias',   c:'var(--isr)',bg:'var(--isrl)',bd:'var(--isrb)'},
+      {v:pvs.length,l:'Provas',   c:'var(--pur)',bg:'var(--purl)',bd:'var(--purb)'},
+    ].map(s=>`<div onclick="go('tarefas')" style="background:${s.bg};border:1.5px solid ${s.bd};border-radius:var(--r);padding:12px 8px;cursor:pointer;text-align:center">
+      <div style="font-size:26px;font-weight:900;color:${s.c};line-height:1">${s.v}</div>
+      <div style="font-size:11px;color:var(--t2);margin-top:3px;font-weight:700">${s.l}</div>
+    </div>`).join('')}
   </div>`;
 
+  // ── compact item row ──
+  const row=item=>{
+    const mc=gMC(item.materia);
+    const t=gT(item.tipo);
+    const o=ov(item.dataVenc,item.status);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:10px;font-weight:900;color:${mc.c};background:${mc.bg};padding:2px 7px;border-radius:99px;white-space:nowrap;flex-shrink:0;max-width:80px;overflow:hidden;text-overflow:ellipsis">${item.materia}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.titulo}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:1px">${CHN[item.filho]?.e||''} ${item.filho} · ${t.e} ${t.l}</div>
+      </div>
+      ${item.dataVenc?`<span style="font-size:11px;font-weight:700;color:${o?'var(--red)':'var(--t2)'};white-space:nowrap;flex-shrink:0">${fd(item.dataVenc)}</span>`:''}
+      <div style="display:flex;gap:2px;flex-shrink:0">
+        ${ST.map(s=>`<button onclick="updSt('${item.id}','${s.v}')" title="${s.l}"
+          style="width:22px;height:22px;border-radius:6px;border:1.5px solid ${item.status===s.v?s.dot:'var(--border)'};background:${item.status===s.v?s.bg:'transparent'};font-size:10px;cursor:pointer;color:${item.status===s.v?s.c:'var(--t3)'}">${s.i}</button>`).join('')}
+      </div>
+    </div>`;
+  };
+
+  const section=(title,color,bg,bd,items,maxShow=5)=>{
+    if(!items.length) return'';
+    const shown=items.slice(0,maxShow);
+    return`<div style="background:${bg};border:1.5px solid ${bd};border-radius:var(--r);padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <span style="font-weight:900;font-size:13px;color:${color}">${title}</span>
+        <span style="font-size:12px;font-weight:700;color:${color};opacity:.7">${items.length} item(s)</span>
+      </div>
+      ${shown.map(row).join('')}
+      ${items.length>maxShow?`<button onclick="go('tarefas')" style="width:100%;margin-top:8px;padding:7px;background:${bg};border:none;color:${color};font-weight:800;font-size:12px;cursor:pointer;border-radius:8px;border:1px solid ${bd}">Ver mais ${items.length-maxShow} →</button>`:''}
+    </div>`;
+  };
+
+  if(!ovd.length&&!hj.length&&!p3.length&&!pvs.length){
+    h+=`<div class="empty"><div class="ei">🎉</div><p>Tudo em dia!</p></div>`;
+  } else {
+    h+=section('⚠️ Atrasados','var(--red)','var(--redl)','var(--redb)',ovd);
+    h+=section('📅 Para hoje','var(--yel)','var(--yell)','var(--yelb)',hj);
+    if(p3.length) h+=section('📌 Próximos 3 dias','var(--isr)','var(--isrl)','var(--isrb)',p3);
+    if(p7.length) h+=section('🗓 Esta semana','var(--pur)','var(--purl)','var(--purb)',p7,3);
+    if(pvs.length&&!hj.some(i=>i.tipo==='prova')) h+=section('📋 Próximas provas','var(--pur)','var(--purl)','var(--purb)',pvs.sort((a,b)=>(a.dataVenc||'9').localeCompare(b.dataVenc||'9')),4);
+  }
+
   if(!_sheetsUrl()){
-    h+=`<div class="sync-bar">
+    h+=`<div class="sync-bar" style="margin-top:8px">
       <span style="font-size:18px">📋</span>
       <div style="flex:1"><div style="font-weight:800;font-size:13px">Conectar Google Sheets</div>
-      <div style="font-size:11px;color:var(--t2);margin-top:1px">Configure o Apps Script para sincronizar dados entre dispositivos</div></div>
+      <div style="font-size:11px;color:var(--t2);margin-top:1px">Sincronize entre dispositivos</div></div>
       <button onclick="openSyncSetup()" class="btn bg2" style="padding:6px 12px;font-size:12px">Configurar</button>
     </div>`;
   }
-
-  if(ovd.length){h+=`<div class="st" style="color:var(--red)">⚠️ Atrasados</div>`;ovd.forEach(i=>{h+=cardHTML(i)})}
-  if(ent.length){h+=`<div class="st" style="color:var(--yel)">📬 Aguardando entrega</div>`;ent.forEach(i=>{h+=cardHTML(i)})}
-  if(pvs.length){h+=`<div class="st">📋 Próximas provas</div>`;pvs.sort((a,b)=>(a.dataVenc||'').localeCompare(b.dataVenc||'')).forEach(i=>{h+=cardHTML(i)})}
-  if(prox.length&&!ovd.length){h+=`<div class="st">📅 Esta semana</div>`;prox.sort((a,b)=>a.dataVenc.localeCompare(b.dataVenc)).slice(0,5).forEach(i=>{h+=cardHTML(i)})}
-  if(!pend.length&&!ovd.length) h+=`<div class="empty"><div class="ei">🎉</div><p>Tudo em dia!</p></div>`;
   return h;
 }
 
 // ══ TAREFAS ══════════════════════════════════════════
 function renderTarefas(){
-  const items=fi(S.items);
-  return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+  // Filtros
+  const fTipo  = S.fTipo  ||'todos';
+  const fMat   = S.fMat   ||'todos';
+  const fSt    = S.fSt    ||'todos';
+  const fSort  = S.fSort  ||'data';
+  const fShowDone = S.fShowDone||false;
+
+  let items=fi(S.items)
+    .filter(i=>fTipo==='todos'||i.tipo===fTipo)
+    .filter(i=>fMat==='todos'||i.materia===fMat)
+    .filter(i=>fSt==='todos'||i.status===fSt)
+    .filter(i=>fShowDone||i.status!=='concluido');
+
+  // Ordenação
+  if(fSort==='data')    items=items.sort((a,b)=>(a.dataVenc||'9').localeCompare(b.dataVenc||'9'));
+  if(fSort==='materia') items=items.sort((a,b)=>a.materia.localeCompare(b.materia));
+  if(fSort==='filho')   items=items.sort((a,b)=>a.filho.localeCompare(b.filho));
+  if(fSort==='titulo')  items=items.sort((a,b)=>a.titulo.localeCompare(b.titulo));
+
+  const selS=(id,val,onchange)=>`<select id="${id}" onchange="${onchange}"
+    style="border:1.5px solid var(--border);border-radius:9px;padding:6px 9px;font-size:12px;font-weight:700;color:var(--text);background:var(--bg);font-family:inherit;-webkit-appearance:none;cursor:pointer">`;
+
+  return`<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
     <div class="tgl" style="flex:1">
       <button class="tbtn${S.tmode==='lista'?' on':''}" onclick="S.tmode='lista';render()">📋 Lista</button>
       <button class="tbtn${S.tmode==='kanban'?' on':''}" onclick="S.tmode='kanban';render()">🗂️ Kanban</button>
     </div>
-    <button onclick="openBulk()" class="btn bs" style="padding:7px 11px;font-size:12px">📥 Em lote</button>
+    <button onclick="openBulk()" class="btn bs" style="padding:7px 10px;font-size:12px">📥</button>
   </div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch">
+    ${selS('ft','fTipo',"S.fTipo=this.value;render()")}
+      <option value="todos">Tipo: todos</option>
+      ${TIPOS.map(t=>`<option value="${t.v}"${fTipo===t.v?' selected':''}>${t.e} ${t.l}</option>`).join('')}
+    </select>
+    ${selS('fm','fMat',"S.fMat=this.value;render()")}
+      <option value="todos">Matéria: todas</option>
+      ${MAT.map(m=>`<option value="${m}"${fMat===m?' selected':''}>${m}</option>`).join('')}
+    </select>
+    ${selS('fs','fSt',"S.fSt=this.value;render()")}
+      <option value="todos">Status: todos</option>
+      ${ST.map(s=>`<option value="${s.v}"${fSt===s.v?' selected':''}>${s.i} ${s.l}</option>`).join('')}
+    </select>
+    ${selS('fo','fSort',"S.fSort=this.value;render()")}
+      <option value="data"${fSort==='data'?' selected':''}>Ordenar: data</option>
+      <option value="materia"${fSort==='materia'?' selected':''}>Ordenar: matéria</option>
+      <option value="filho"${fSort==='filho'?' selected':''}>Ordenar: filho</option>
+      <option value="titulo"${fSort==='titulo'?' selected':''}>Ordenar: título</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" ${fShowDone?'checked':''} onchange="S.fShowDone=this.checked;render()" style="accent-color:var(--accent)">
+      Concluídos
+    </label>
+  </div>
+  <div style="font-size:12px;color:var(--t3);text-align:right;margin-bottom:6px;font-weight:600">${items.length} item(s)</div>
   ${S.tmode==='lista'?renderLista(items):renderKanban(items)}`;
 }
 
@@ -458,12 +557,34 @@ function renderCal(){
   const yr=S.cal.getFullYear(),mo=S.cal.getMonth();
   const fd1=new Date(yr,mo,1).getDay();
   const dim=new Date(yr,mo+1,0).getDate();
-  const all=fi(S.items);
+  const fCalTipo=S.fCalTipo||'todos';
+  const fCalFilho=S.fCalFilho||'todos';
+  let all=fi(S.items)
+    .filter(i=>fCalTipo==='todos'||i.tipo===fCalTipo)
+    .filter(i=>fCalFilho==='todos'||i.filho===fCalFilho||i.filho==='Ambos');
   const t=new Date();const td=t.getDate(),tm=t.getMonth(),ty=t.getFullYear();
   const gd=d=>{const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;return all.filter(i=>i.dataVenc===ds)};
   const cells=[...Array(fd1).fill(null),...Array.from({length:dim},(_,i)=>i+1)];
+  const selSt=(id,val,onch,opts)=>`<select id="${id}" onchange="${onch}"
+    style="border:1.5px solid var(--border);border-radius:9px;padding:6px 9px;font-size:12px;font-weight:700;color:var(--text);background:var(--bg);font-family:inherit;-webkit-appearance:none">${opts}</select>`;
 
-  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+  let h=`<div style="display:flex;gap:6px;margin-bottom:8px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+    ${selSt('fct',fCalTipo,"S.fCalTipo=this.value;render()",
+      '<option value="todos">Tipo: todos</option>'+TIPOS.map(t=>`<option value="${t.v}"${fCalTipo===t.v?' selected':''}>${t.e} ${t.l}</option>`).join('')
+    )}
+    ${selSt('fcf',fCalFilho,"S.fCalFilho=this.value;render()",
+      '<option value="todos">Filho: todos</option>'+['Iza','Israel','Ambos'].map(n=>`<option value="${n}"${fCalFilho===n?' selected':''}>${n}</option>`).join('')
+    )}
+    <button onclick="S.fCalTipo='prova';S.fCalFilho='todos';render()"
+      style="padding:6px 12px;border-radius:9px;font-size:12px;font-weight:800;border:1.5px solid var(--purb);background:${fCalTipo==='prova'?'var(--purl)':'var(--bg)'};color:var(--pur);white-space:nowrap;flex-shrink:0;cursor:pointer">
+      📋 Só provas
+    </button>
+    <button onclick="S.fCalTipo='todos';S.fCalFilho='todos';render()"
+      style="padding:6px 12px;border-radius:9px;font-size:12px;font-weight:800;border:1.5px solid var(--border);background:var(--bg);color:var(--t2);white-space:nowrap;flex-shrink:0;cursor:pointer">
+      Limpar
+    </button>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <button onclick="S.cal=new Date(${yr},${mo-1});render()" style="font-size:22px;padding:4px 12px;border-radius:10px;border:none;background:var(--bg);cursor:pointer;color:var(--t2)">‹</button>
     <span style="font-weight:900;font-size:16px">${MON[mo]} ${yr}</span>
     <button onclick="S.cal=new Date(${yr},${mo+1});render()" style="font-size:22px;padding:4px 12px;border-radius:10px;border:none;background:var(--bg);cursor:pointer;color:var(--t2)">›</button>
@@ -480,7 +601,7 @@ function renderCal(){
         style="${hasOv&&!isT?'border-color:var(--redb);background:var(--redl)':''}"
         onclick="S.calSel=${isSel?'null':day};render()">
         <div class="cn">${day}</div>
-        <div class="dots">${di.slice(0,3).map(i=>{const mc=gMC(i.materia);return`<span class="dot" style="background:${mc.c}"></span>`}).join('')}</div>
+        <div class="dots">${di.slice(0,3).map(i=>{const mc=gMC(i.materia);const isP=i.tipo==='prova'||i.tipo==='exercicio';return`<span class="dot${i.status==='concluido'?' done':''}" style="background:${mc.c};${isP?'width:7px;height:7px;border:1.5px solid '+mc.c+';outline:1px solid #fff':''}"></span>`}).join('')}</div>
       </div>`;
     }).join('')}
   </div>`;
@@ -611,12 +732,17 @@ function renderAvisos(){
 const _gemKey=()=>GEMINI_KEY||DB.gk()||'';
 
 function renderComunicados(){
+  const mostrarLidos=DB.gMostrarLidos();
   let h=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
     <input id="com-search" type="search" placeholder="🔍 Buscar comunicados..."
       style="flex:1;border:2px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;background:var(--bg);font-family:inherit;outline:none"
       oninput="renderComunicadosList()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
     <button onclick="openComImport()" class="btn ba" style="padding:9px 13px;font-size:18px;flex-shrink:0" title="Importar via IA">🤖</button>
     <button onclick="openComForm()" class="btn bp" style="padding:9px 13px;font-size:18px;flex-shrink:0" title="Adicionar manual">+</button>
+    <button onclick="DB.sMostrarLidos(!DB.gMostrarLidos());render()" title="Mostrar/ocultar lidos"
+      style="padding:9px 11px;border-radius:var(--rs);font-size:12px;font-weight:800;border:1.5px solid var(--border);background:${mostrarLidos?'var(--grnl)':'var(--bg)'};color:${mostrarLidos?'var(--grn)':'var(--t2)'};flex-shrink:0;cursor:pointer">
+      👁 ${mostrarLidos?'Ocultar lidos':'Ver lidos'}
+    </button>
   </div>
   <div class="cr" id="com-tags" style="margin-bottom:12px">
     ${['Todos',...ETIQUETAS].map(t=>`<button onclick="S.comTag='${t}';renderComunicadosList()" class="chip"
@@ -645,11 +771,17 @@ function renderComunicadosList(){
   const tag=S.comTag||'Todos';
   const filho=S.filho;
 
+  const mostrarLidosList=DB.gMostrarLidos();
   let coms=S.coms
     .filter(c=>tag==='Todos'||c.etiqueta===tag)
     .filter(c=>filho==='Todos'||c.filho===filho||c.filho==='Ambos')
     .filter(c=>!q||(c.titulo+c.conteudo+c.remetente+c.etiqueta).toLowerCase().includes(q))
-    .sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+    .filter(c=>mostrarLidosList||!c.lido)
+    .sort((a,b)=>{
+      if(a.fixado&&!b.fixado) return -1;
+      if(!a.fixado&&b.fixado) return 1;
+      return (b.data||'').localeCompare(a.data||'');
+    });
 
   if(!coms.length){
     el.innerHTML=`<div class="empty"><div class="ei">📌</div><p>${q?'Nenhum resultado':'Nenhum comunicado'}</p><p style="font-size:13px;color:var(--t3);margin-top:4px">Use 🤖 para importar um print ou + para adicionar</p></div>`;
@@ -657,12 +789,14 @@ function renderComunicadosList(){
   }
   el.innerHTML=coms.map(c=>{
     const pin=c.fixado?'background:var(--al);border-color:var(--yelb)':'';
-    return`<div class="card" style="${pin};margin-bottom:10px" id="cc-${c.id}">
+    const lidoStyle=c.lido&&!c.fixado?'opacity:0.55;':'';
+    return`<div class="card" style="${pin};${lidoStyle}margin-bottom:10px" id="cc-${c.id}">
       <div class="card-header" style="background:${c.fixado?'var(--yell)':'var(--bg)'};border-bottom:1.5px solid var(--border)">
         <span style="font-size:12px;font-weight:900;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           ${c.etiqueta||'Comunicado'} ${c.fixado?'· 📌 Fixado':''}
         </span>
         <div style="display:flex;gap:1px">
+          <button onclick="toggleLido('${c.id}')" style="padding:6px;font-size:14px;color:${c.lido?'var(--grn)':'var(--t3)'}" title="${c.lido?'Marcar como não lido':'Marcar como lido'}">${c.lido?'✅':'👁'}</button>
           <button onclick="togglePin('${c.id}')" style="padding:6px;font-size:14px;color:var(--t3)" title="Fixar">${c.fixado?'📌':'📍'}</button>
           <button onclick="openComEdit('${c.id}')" style="padding:6px;font-size:14px;color:var(--t3)"
             onmouseenter="this.style.color='var(--isr)'" onmouseleave="this.style.color='var(--t3)'">✏️</button>
@@ -697,7 +831,14 @@ function togglePin(id){
   S.coms=S.coms.map(c=>c.id===id?{...c,fixado:!c.fixado}:c);
   DB.sc(S.coms);
   renderComunicadosList();
-  if(_sheetsUrl()) syncComToSheets();
+  if(_sheetsUrl()) pushToSheets();
+}
+
+function toggleLido(id){
+  S.coms=S.coms.map(c=>c.id===id?{...c,lido:!c.lido}:c);
+  DB.sc(S.coms);
+  renderComunicadosList();
+  if(_sheetsUrl()) pushToSheets();
 }
 
 function delCom(id){
@@ -787,7 +928,7 @@ function _saveItem(id,isE){
   DB.log({type:isE?'edit':'add',msg:`${isE?'Editado':'Novo'}: ${item.titulo} — ${item.materia} (${item.filho})`});
   S.log=DB.gl();
   closeAll();render();updateBadge();
-  if(_sheetsUrl()) syncToSheets();
+  if(_sheetsUrl()) pushToSheets();
 }
 
 function _renderBulk(){
@@ -834,7 +975,7 @@ function _processBulk(){
   DB.log({type:'bulk',msg:`${added} item(s) adicionados em lote`});
   S.log=DB.gl();
   closeAll();render();updateBadge();
-  if(_sheetsUrl()) syncToSheets();
+  if(_sheetsUrl()) pushToSheets();
   setTimeout(()=>alert(`✅ ${added} item(s) adicionado(s)!`),100);
 }
 
@@ -875,7 +1016,7 @@ function _saveNota(){
   DB.log({type:'nota',msg:`Nota ${nota} — ${n.materia} (${n.filho}): ${n.atividade}`});
   S.log=DB.gl();
   closeAll();render();
-  if(SHEETS_URL) syncToSheets();
+  if(_sheetsUrl()) pushToSheets();
 }
 
 function _renderSyncSetup(){
@@ -1309,73 +1450,63 @@ function salvarGeminiKey(){
 // ══ SYNC COM SHEETS ══════════════════════════════════
 const _sheetsUrl=()=>SHEETS_URL||localStorage.getItem('mx4_sheetsUrl')||'';
 
+// ── PUSH imediato: chamado após cada alteração no app ──
+async function pushToSheets(){
+  const url=_sheetsUrl(); if(!url) return;
+  try{
+    await _getSync(url,'setItems',S.items);
+    await _getSync(url,'setNotas',S.notas);
+    await syncComToSheets();
+  }catch(e){ console.warn('Push failed silently:',e.message); }
+}
+
+// ── PULL completo: botão 🔄 — busca novidades da planilha ──
 async function syncSheets(){
   const url=_sheetsUrl();
-  if(!url){alert('Configure a URL do Google Sheets primeiro (botão Configurar na tela Início).');return;}
+  if(!url){alert('Configure a URL do Google Sheets primeiro (⚙️ no cabeçalho).');return;}
   S.syncing=true;renderHdr();
   try{
-    // 1. Busca dados da planilha
+    // PASSO 1: Envia estado local PRIMEIRO (garante que mudanças feitas no app não se perdem)
+    await pushToSheets();
+
+    // PASSO 2: Busca dados da planilha (novidades adicionadas pelo computador)
     const tok=SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||'';
-    const res=await fetch(url+'?action=get&token='+encodeURIComponent(tok), {redirect:'follow'});
+    const res=await fetch(url+'?action=get&token='+encodeURIComponent(tok),{redirect:'follow'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
-    if(!data.ok) throw new Error(data.error||'Erro desconhecido');
+    if(!data.ok) throw new Error(data.error||'Acesso negado. Verifique o token.');
 
-    // ── MERGE BIDIRECIONAL ──
-    // Regra: planilha é fonte de verdade para itens existentes.
-    // Itens novos do app (não presentes na planilha) são adicionados.
-    // Resultado final é enviado de volta para a planilha.
-
-    const mergeArrays = (fromSheets, fromLocal) => {
-      // IDs vindos da planilha (podem ter sido editados lá)
-      const sheetsMap = new Map(fromSheets.map(i => [i.id, i]));
-      // IDs locais que não existem na planilha = novos do app
-      const onlyLocal = fromLocal.filter(i => i.id && !sheetsMap.has(i.id));
-      // Resultado: todos da planilha + novos do app
-      return [...fromSheets, ...onlyLocal];
+    // PASSO 3: Merge — local tem prioridade; só adiciona o que é NOVO na planilha
+    const merge=(local,remote)=>{
+      if(!remote||!remote.length) return local;
+      const localIds=new Set(local.map(i=>i.id).filter(Boolean));
+      const novos=remote.filter(i=>i.id&&!localIds.has(i.id)&&i.titulo&&i.titulo.trim());
+      return [...local,...novos];
     };
-
-    // Sempre aplica (mesmo que planilha venha vazia — significa que foi limpa)
-    S.items = mergeArrays(data.items || [], S.items);
-    S.notas = mergeArrays(data.notas || [], S.notas);
-    DB.si(S.items);
-    DB.sn(S.notas);
-
-    // 2. Envia conjunto mesclado de volta para a planilha
-    await _postToSheets(url);
-
-    // Sync comunicados
-    if(data.coms){
-      const sheetsIds=new Set(data.coms.map(c=>c.id));
-      const localOnly=S.coms.filter(c=>c.id&&!sheetsIds.has(c.id));
-      S.coms=[...data.coms,...localOnly];
-      DB.sc(S.coms);
-    }
-    await syncComToSheets();
+    S.items=merge(S.items, data.items||[]);
+    S.notas=merge(S.notas, data.notas||[]);
+    S.coms =merge(S.coms,  data.coms ||[]);
+    DB.si(S.items); DB.sn(S.notas); DB.sc(S.coms);
 
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     DB.sSync(now);
-    DB.log({type:'sync',msg:`Sincronizado com Google Sheets às ${now}`});
+    DB.log({type:'sync',msg:`Sincronizado com Sheets às ${now}`});
     S.log=DB.gl();
   }catch(e){
-    alert('Erro ao sincronizar:\n'+e.message+'\n\nDicas:\n• A URL está correta?\n• O Apps Script foi implantado com acesso "Qualquer pessoa"?\n• O SHEET_ID está configurado no script?');
+    alert('Erro ao sincronizar:\n'+e.message+'\n\nDicas:\n• A URL está correta?\n• O Apps Script foi reimplantado após último código?\n• O SHEETS_TOKEN é o mesmo dos dois lados?');
   }finally{
     S.syncing=false;renderHdr();render();updateBadge();
   }
 }
 
 async function syncToSheets(){
-  const url=_sheetsUrl();
-  if(!url) return;
-  try{ await _postToSheets(url); }catch(e){ console.warn('Sync to sheets failed:',e.message); }
+  const url=_sheetsUrl(); if(!url) return;
+  try{ await pushToSheets(); }catch(e){ console.warn('syncToSheets:',e.message); }
 }
 
 async function _postToSheets(url){
-  // Apps Script Web App faz redirect 302 em POSTs externos, convertendo para GET e perdendo o body.
-  // Solução: enviar tudo via GET com dados comprimidos em parâmetro de URL.
-  // Dividimos em dois GETs se necessário (items e notas separados) para não exceder limite de URL.
-  await _getSync(url, 'setItems', S.items);
-  await _getSync(url, 'setNotas', S.notas);
+  await _getSync(url,'setItems',S.items);
+  await _getSync(url,'setNotas',S.notas);
 }
 
 async function _getSync(url, action, data){
@@ -1414,7 +1545,7 @@ function updSt(id,st){
   DB.log({type:'status',msg:`${item.materia} · ${item.titulo} → ${gS(st).l} (${item.filho})`});
   S.log=DB.gl();
   render();updateBadge();
-  if(SHEETS_URL) syncToSheets();
+  if(_sheetsUrl()) pushToSheets();
 }
 
 function delItem(id){
@@ -1425,7 +1556,7 @@ function delItem(id){
   DB.log({type:'delete',msg:`Excluído: ${item.titulo} (${item.filho})`});
   S.log=DB.gl();
   render();updateBadge();
-  if(SHEETS_URL) syncToSheets();
+  if(_sheetsUrl()) pushToSheets();
 }
 
 function delNota(id){
