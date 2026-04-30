@@ -160,11 +160,11 @@ input,select,textarea{font-family:inherit}
 <script>
 // ══ CONSTANTS ══════════════════════════════════════
 
-const SHEETS_URL   = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec' - JÁ DIGITADA NO APLICATIVO, NÃO INSERIR AQUI!
-const SHEETS_TOKEN = '';  // A mesma senha definida no SHEETS_TOKEN do Code.gs - JÁ DIGITADA NO APLICATIVO, NÃO INSERIR AQUI!
+const SHEETS_URL   = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
+const SHEETS_TOKEN = '';  // A mesma senha definida no SHEETS_TOKEN do Code.gs
 
 // Chave de API do Gemini (gratuita em aistudio.google.com):
-const GEMINI_KEY = '';  // Ex: 'AIzaSy...' - JÁ DIGITADA NO APLICATIVO, NÃO INSERIR AQUI!
+const GEMINI_KEY = '';  // Ex: 'AIzaSy...'
 
 const ETIQUETAS = [
   'Faltou/Dever','Material incomp','Biblioteca','Atividade Aval.','Calendário',
@@ -263,7 +263,41 @@ const S={
 
 function init(){
   S.items=DB.gi();S.notas=DB.gn();S.log=DB.gl();S.coms=DB.gc();
+  _autoCleanup(); // remove itens antigos ao abrir
   renderHdr();render();updateBadge();
+}
+
+function _autoCleanup(){
+  const now=new Date(); now.setHours(0,0,0,0);
+  const DUAS_SEM=14*24*60*60*1000;
+  let changed=false;
+
+  // Itens concluídos há mais de 2 semanas
+  const novosItems=S.items.filter(i=>{
+    if(i.status!=='concluido') return true;
+    if(!i.dataVenc) return true;
+    const d=new Date(i.dataVenc+'T00:00:00');
+    return (now-d)<DUAS_SEM;
+  });
+  if(novosItems.length<S.items.length){
+    S.items=novosItems; DB.si(S.items); changed=true;
+    DB.log({type:'delete',msg:`Limpeza automática: ${S.items.length !== novosItems.length?'':''} tarefas concluídas removidas`});
+  }
+
+  // Comunicados: data passada há >2 semanas (exceto fixados)
+  const novosComs=S.coms.filter(c=>{
+    if(c.fixado) return true;
+    if(c.data){
+      const d=new Date(c.data+'T00:00:00');
+      return (now-d)<DUAS_SEM;
+    }
+    return true; // sem data: mantém (sem timestamp de criação)
+  });
+  if(novosComs.length<S.coms.length){
+    S.coms=novosComs; DB.sc(S.coms); changed=true;
+  }
+
+  if(changed && _sheetsUrl()) pushToSheets();
 }
 
 // ══ HELPERS ════════════════════════════════════════
@@ -415,10 +449,10 @@ function renderDash(){
     const t=gT(item.tipo);
     const o=ov(item.dataVenc,item.status);
     return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:10px;font-weight:900;color:${mc.c};background:${mc.bg};padding:2px 7px;border-radius:99px;white-space:nowrap;flex-shrink:0;max-width:80px;overflow:hidden;text-overflow:ellipsis">${item.materia}</span>
-      <div style="flex:1;min-width:0">
+      <span onclick="openEdit('${item.id}')" style="font-size:10px;font-weight:900;color:${mc.c};background:${mc.bg};padding:2px 7px;border-radius:99px;white-space:nowrap;flex-shrink:0;max-width:80px;overflow:hidden;text-overflow:ellipsis;cursor:pointer">${item.materia}</span>
+      <div onclick="openEdit('${item.id}')" style="flex:1;min-width:0;cursor:pointer">
         <div style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.titulo}</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:1px">${CHN[item.filho]?.e||''} ${item.filho} · ${t.e} ${t.l}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:1px">${CHN[item.filho]?.e||''} ${item.filho} · ${t.e} ${t.l}${item.descricao?' · '+item.descricao.slice(0,30)+(item.descricao.length>30?'…':''):''}</div>
       </div>
       ${item.dataVenc?`<span style="font-size:11px;font-weight:700;color:${o?'var(--red)':'var(--t2)'};white-space:nowrap;flex-shrink:0">${fd(item.dataVenc)}</span>`:''}
       <div style="display:flex;gap:2px;flex-shrink:0">
@@ -776,11 +810,20 @@ function renderComunicadosList(){
     .filter(c=>tag==='Todos'||c.etiqueta===tag)
     .filter(c=>filho==='Todos'||c.filho===filho||c.filho==='Ambos')
     .filter(c=>!q||(c.titulo+c.conteudo+c.remetente+c.etiqueta).toLowerCase().includes(q))
-    .filter(c=>mostrarLidosList||!c.lido)
-    .sort((a,b)=>{
+    .filter(c=>mostrarLidosList||!c.lido||c.fixado)
+    .sort(function(a,b){
+      // Fixados sempre no topo
       if(a.fixado&&!b.fixado) return -1;
       if(!a.fixado&&b.fixado) return 1;
-      return (b.data||'').localeCompare(a.data||'');
+      // Não lidos antes de lidos
+      if(!a.lido&&b.lido) return -1;
+      if(a.lido&&!b.lido) return 1;
+      // Dentro do mesmo grupo: mais recentes primeiro
+      const da=a.data||''; const db=b.data||'';
+      if(db&&da) return db.localeCompare(da);
+      if(db&&!da) return 1;
+      if(!db&&da) return -1;
+      return 0;
     });
 
   if(!coms.length){
@@ -863,7 +906,7 @@ function renderModals(){
   if(_showGemini) _renderGeminiSetup();
 }
 function openForm(){_editId=null;_showForm=true;renderModals()}
-function openEdit(id){_editId=id;_showForm=true;renderModals()}
+function openEdit(id){_editId=id;_showForm=true;renderModals();document.querySelector('.md')?.scrollTo(0,0);}
 function openBulk(){_showBulk=true;renderModals()}
 function openNota(){_showNota=true;renderModals()}
 function openSyncSetup(){_showSync=true;renderModals()}
@@ -1229,16 +1272,23 @@ Para cada item, retorne um objeto com:
   "tipo_data": "prazo | evento | (vazio)",
   "descricao": "detalhes relevantes: páginas, instruções, materiais, valores, etc.",
   "remetente": "nome do remetente se identificável",
-  "etiqueta": "uma das etiquetas: Faltou/Dever | Material incomp | Biblioteca | Atividade Aval. | Calendário | Atraso | Convite | Material Apoio | Notificação | Uso de celular | Lembrete | Sem uniforme | Trab. sem fazer | Conteúdo Prova | Ocorrência | Trabalho | Dever não feito | Importante | Comunicado | Rotina | Urgente | Notícias | Dever de casa | Outros"
+  "etiqueta": "uma das etiquetas: Faltou/Dever | Material incomp | Biblioteca | Atividade Aval. | Calendário | Atraso | Convite | Material Apoio | Notificação | Uso de celular | Lembrete | Sem uniforme | Trab. sem fazer | Conteúdo Prova | Ocorrência | Trabalho | Dever não feito | Importante | Comunicado | Rotina | Urgente | Notícias | Dever de casa | Outros",
+  "fixado": false (true apenas para ocorrências ou urgentes)
 }
 
 REGRAS:
-- Se uma mensagem tem para casa de 2 matérias diferentes, crie 2 itens separados
-- Se menciona prova E conteúdo da prova, crie 2 itens (um tipo "prova" com a data, outro tipo "conteudo" com o que vai cair)
-- "precisa_status" = true para: tarefas, provas, materiais a trazer, trabalhos
-- "precisa_status" = false para: comunicados informativos, reuniões de pais (sem ação das crianças), eventos sem preparação necessária
-- Se não conseguir determinar o filho pela mensagem, use "Indefinido"
-- Para datas relativas como "semana que vem" ou "próxima quinta", calcule a data real a partir de hoje (${new Date().toLocaleDateString('pt-BR')})`;
+- Para casa com 2 matérias → 2 itens separados
+- Prova + conteúdo da prova → 2 itens
+- EVENTO com prazo de ação → 2 itens:
+  Ex: "Festa junina 27/06 — devolver autorização até 30/04"
+  → Item 1: tipo=evento, precisa_status=false, data=2026-06-27, titulo="Festa Junina Arraiá"
+  → Item 2: tipo=material, precisa_status=true, data=2026-04-30, titulo="Devolver autorização da Festa Junina"
+- precisa_status=true: tarefas, provas, materiais, trabalhos, qualquer prazo de ação
+- precisa_status=false: comunicados informativos sem ação necessária
+- Comunicado direto sobre ocorrência da criança: etiqueta="Ocorrência", fixado=true
+- Filho indefinido pelo contexto → use "Indefinido"
+- Datas relativas → calcule a partir de hoje (${new Date().toLocaleDateString('pt-BR')})
+- Campo "fixado": true apenas para ocorrências, urgentes ou eventos importantes de calendário`;
 
   try {
     let body;
@@ -1391,9 +1441,11 @@ function _salvarTodos(total){
       // Salva como comunicado (sem status)
       const imgSrc2=salvos===0?(window._impImg||''):'';
       const origType2=imgSrc2?'ia-imagem':'ia-texto';
+      const fixadoIA=document.getElementById('ri-status-'+i)?.dataset?.fixado==='true';
+      const etiqMap={reuniao:'Comunicado',evento:'Calendário',comunicado:'Comunicado'};
       const com={id:uid(),titulo,filho,
-        etiqueta:tipo==='reuniao'?'Comunicado':tipo==='evento'?'Calendário':'Comunicado',
-        remetente,conteudo:descricao,data:dataVenc,fixado:false,
+        etiqueta:etiqMap[tipo]||'Comunicado',
+        remetente,conteudo:descricao,data:dataVenc,fixado:fixadoIA,
         imagem:imgSrc2,origem:origType2,
       };
       S.coms=[...S.coms,com];
@@ -1510,25 +1562,37 @@ async function _postToSheets(url){
 }
 
 async function _getSync(url, action, data){
-  const json = JSON.stringify(data);
-  const b64  = btoa(unescape(encodeURIComponent(json)));
-  const tok  = SHEETS_TOKEN || localStorage.getItem('mx4_sheetsToken') || '';
-  // Operações de escrita usam no-cors — dados chegam ao servidor sem bloqueio CORS
-  // Leitura (action=get) usa fetch normal para receber a resposta JSON
+  const tok = SHEETS_TOKEN || localStorage.getItem('mx4_sheetsToken') || '';
+
   if(action === 'get'){
-    const res = await fetch(url + '?action=get&token=' + encodeURIComponent(tok));
+    const res = await fetch(url + '?action=get&token=' + encodeURIComponent(tok), {redirect:'follow'});
     return res.json();
   }
-  // Para escrita: chunks de no máximo 200 itens para não exceder limite de URL
-  const CHUNK = 200;
+
+  // Escrita: divide em lotes de 50 para não exceder limite de URL (~8KB por requisição)
+  const CHUNK = 50;
   const arr = Array.isArray(data) ? data : [data];
   for(let i = 0; i < arr.length; i += CHUNK){
     const chunk = arr.slice(i, i + CHUNK);
-    const b64chunk = btoa(unescape(encodeURIComponent(JSON.stringify(chunk))));
-    await fetch(
-      url + '?action=' + action + '&token=' + encodeURIComponent(tok) + '&data=' + encodeURIComponent(b64chunk),
-      { mode: 'no-cors' }  // ignora CORS — suficiente para escrita
-    );
+    // Remove imagens (base64) dos itens antes de enviar — muito grandes para URL
+    const chunkClean = chunk.map(function(item){
+      if(item && item.imagem && item.imagem.length > 100){
+        const c = Object.assign({}, item); c.imagem = ''; return c;
+      }
+      return item;
+    });
+    const b64chunk = btoa(unescape(encodeURIComponent(JSON.stringify(chunkClean))));
+    const reqUrl = url + '?action=' + action + '&token=' + encodeURIComponent(tok) + '&data=' + encodeURIComponent(b64chunk);
+    if(reqUrl.length > 7500){
+      // URL muito longa mesmo com chunk: divide pela metade recursivamente
+      if(chunk.length > 1){
+        const half = Math.ceil(chunk.length/2);
+        await _getSync(url, action, arr.slice(i, i+half));
+        await _getSync(url, action, arr.slice(i+half, i+CHUNK));
+        continue;
+      }
+    }
+    await fetch(reqUrl, { mode: 'no-cors' });
   }
 }
 
