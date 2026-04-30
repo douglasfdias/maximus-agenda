@@ -1079,6 +1079,9 @@ function _renderSyncSetup(){
     <div class="fi"><label>Token de segurança</label>
       <input id="sync-token" type="password" value="${SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||''}"
         placeholder="A senha definida no SHEETS_TOKEN do Code.gs"></div>
+    <div class="fi"><label>Chave do Gemini (IA)</label>
+      <input id="sync-gemini" type="password" value="${GEMINI_KEY||DB.gk()||''}"
+        placeholder="AIzaSy... (obtenha em aistudio.google.com/apikey)"></div>
     <div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-top:4px;font-size:12px;color:var(--t2);line-height:1.6">
       <strong>Como atualizar o app:</strong><br>
       1. Suba o novo <code>index.html</code> no GitHub<br>
@@ -1098,12 +1101,14 @@ function _renderSyncSetup(){
 function _saveSyncUrl(){
   const url=document.getElementById('sync-url').value.trim();
   const tok=document.getElementById('sync-token')?.value.trim()||'';
+  const gem=document.getElementById('sync-gemini')?.value.trim()||'';
   if(!url){closeAll();return;}
   localStorage.setItem('mx4_sheetsUrl',url);
   if(tok) localStorage.setItem('mx4_sheetsToken',tok);
+  if(gem) DB.sk(gem);
   closeAll();
   render();
-  alert('Configuração salva!\n\nPara tornar permanente, edite as constantes SHEETS_URL e SHEETS_TOKEN no início do index.html e faça upload no GitHub.');
+  alert('Configuração salva!');
 }
 
 // ══ COMUNICADOS — FORMULÁRIOS ════════════════════════
