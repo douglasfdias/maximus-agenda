@@ -3,7 +3,7 @@
 //  Ao subir nova versão do app, incremente o número abaixo:
 //  v1 → v2 → v3 → ...
 // ══════════════════════════════════════════════════════════════════
-const VERSION = 'v5';
+const VERSION = 'v6';
 const CACHE = 'maximus-' + VERSION;
 const ASSETS = ['/maximus-agenda/', '/maximus-agenda/index.html', '/maximus-agenda/manifest.json'];
 
