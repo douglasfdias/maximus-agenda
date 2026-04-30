@@ -1,8 +1,16 @@
-const CACHE = 'maximus-v4';
+// ══════════════════════════════════════════════════════════════════
+//  AGENDA MÁXIMUS — Service Worker
+//  Ao subir nova versão do app, incremente o número abaixo:
+//  v1 → v2 → v3 → ...
+// ══════════════════════════════════════════════════════════════════
+const VERSION = 'v5';
+const CACHE = 'maximus-' + VERSION;
 const ASSETS = ['/maximus-agenda/', '/maximus-agenda/index.html', '/maximus-agenda/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(()=>{})));
+  // Não espera — instala imediatamente
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
@@ -26,6 +34,7 @@ self.addEventListener('fetch', e => {
   );
 });
 
+// Recebe mensagem para ativar nova versão imediatamente
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
