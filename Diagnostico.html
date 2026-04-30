@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico — Agenda Máximus</title>
+<style>
+  body{font-family:system-ui,sans-serif;padding:16px;background:#F5F4F0;color:#1A1209;font-size:14px}
+  h2{font-size:16px;margin:16px 0 8px}
+  .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #E7E5E4}
+  .ok{color:#2E7D32;font-weight:700}
+  .warn{color:#E65100;font-weight:700}
+  .err{color:#C62828;font-weight:700}
+  pre{font-size:11px;background:#F5F4F0;border-radius:8px;padding:10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto}
+  button{background:#1A1209;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-bottom:8px}
+  button.sec{background:#F5F4F0;color:#1A1209;border:1px solid #E7E5E4}
+  .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F5F4F0}
+  .label{color:#6B5E4E;font-size:12px}
+  .val{font-weight:700;font-size:13px}
+</style>
+</head>
+<body>
+<h1 style="font-size:20px;font-weight:900">🔍 Diagnóstico Máximus</h1>
+<p style="color:#6B5E4E;font-size:13px">Execute cada teste e copie os resultados para enviar ao Claude.</p>
+
+<div class="card">
+  <h2>1. localStorage — dados no celular</h2>
+  <div id="ls-result">Clique em Executar...</div>
+  <br>
+  <button onclick="testeLS()">▶ Executar Teste 1</button>
+</div>
+
+<div class="card">
+  <h2>2. Cleanup — o que seria deletado</h2>
+  <div id="cleanup-result">Clique em Executar...</div>
+  <br>
+  <button onclick="testeCleanup()">▶ Executar Teste 2</button>
+</div>
+
+<div class="card">
+  <h2>3. Comunicados — verificar colunas data/conteudo</h2>
+  <div id="coms-result">Clique em Executar...</div>
+  <br>
+  <button onclick="testeComs()">▶ Executar Teste 3</button>
+</div>
+
+<div class="card">
+  <h2>4. Configurações</h2>
+  <div id="config-result">Clique em Executar...</div>
+  <br>
+  <button onclick="testeConfig()">▶ Executar Teste 4</button>
+</div>
+
+<div class="card">
+  <h2>5. Verificar se push automático ocorre no init</h2>
+  <div id="push-result">Clique em Executar...</div>
+  <br>
+  <button onclick="testePush()">▶ Executar Teste 5</button>
+</div>
+
+<div class="card" style="background:#FFF3E0;border-color:#FFCC80">
+  <h2>📋 Resultado completo para copiar</h2>
+  <button onclick="copiarTudo()" class="sec">📋 Copiar tudo</button>
+  <pre id="resultado-final">Execute os testes acima primeiro.</pre>
+</div>
+
+<script>
+const resultados = {};
+
+function row(label, val, tipo) {
+  const cls = tipo==='ok'?'ok':tipo==='warn'?'warn':tipo==='err'?'err':'val';
+  return `<div class="row"><span class="label">${label}</span><span class="${cls}">${val}</span></div>`;
+}
+
+function testeLS() {
+  const el = document.getElementById('ls-result');
+  try {
+    const items = JSON.parse(localStorage.getItem('mx4_items') || 'null');
+    const notas = JSON.parse(localStorage.getItem('mx4_notas') || '[]');
+    const coms  = JSON.parse(localStorage.getItem('mx4_coms')  || '[]');
+    const log   = JSON.parse(localStorage.getItem('mx4_log')   || '[]');
+    const sync  = localStorage.getItem('mx4_sync') || '—';
+    const hasSheetsUrl = !!(localStorage.getItem('mx4_sheetsUrl'));
+    const hasToken     = !!(localStorage.getItem('mx4_sheetsToken'));
+    const hasGemini    = !!(localStorage.getItem('mx4_gemini'));
+    const isSample = items && items.some(i => i.id === 's1' || i.id === 's2');
+
+    const r = {
+      items: items ? items.length : 'NULL (usa sample data)',
+      notas: notas.length,
+      coms: coms.length,
+      log_entries: log.length,
+      ultimo_sync: sync,
+      sheets_url_salva: hasSheetsUrl,
+      token_salvo: hasToken,
+      gemini_salvo: hasGemini,
+      usando_sample_data: isSample,
+    };
+
+    resultados.ls = r;
+    el.innerHTML =
+      row('Itens no localStorage', r.items, items && items.length > 0 ? 'ok' : 'err') +
+      row('Notas', r.notas, 'val') +
+      row('Comunicados', r.coms, r.coms > 0 ? 'ok' : 'warn') +
+      row('Último sync', r.ultimo_sync, 'val') +
+      row('URL do Sheets salva?', r.sheets_url_salva ? 'Sim' : 'NÃO', r.sheets_url_salva ? 'ok' : 'warn') +
+      row('Token salvo?', r.token_salvo ? 'Sim' : 'NÃO', r.token_salvo ? 'ok' : 'warn') +
+      row('Gemini salvo?', r.gemini_salvo ? 'Sim' : 'NÃO', 'val') +
+      row('Usando dados de exemplo?', isSample ? 'SIM — dados reais não carregados!' : 'Não', isSample ? 'err' : 'ok');
+
+    atualizarResultadoFinal();
+  } catch(e) {
+    el.innerHTML = `<span class="err">Erro: ${e.message}</span>`;
+  }
+}
+
+function testeCleanup() {
+  const el = document.getElementById('cleanup-result');
+  try {
+    const DUAS_SEM = 14 * 24 * 60 * 60 * 1000;
+    const now = new Date(); now.setHours(0,0,0,0);
+    const items = JSON.parse(localStorage.getItem('mx4_items') || '[]');
+    const coms  = JSON.parse(localStorage.getItem('mx4_coms')  || '[]');
+
+    const deletadosItems = items.filter(i => {
+      if(i.status !== 'concluido') return false;
+      if(!i.dataVenc) return false;
+      const d = new Date(i.dataVenc + 'T00:00:00');
+      return (now - d) >= DUAS_SEM;
+    });
+
+    const deletadosComs = coms.filter(c => {
+      if(c.fixado) return false;
+      if(c.data) {
+        const d = new Date(c.data + 'T00:00:00');
+        return (now - d) >= DUAS_SEM;
+      }
+      return false;
+    });
+
+    const r = {
+      total_items: items.length,
+      seriam_deletados_items: deletadosItems.length,
+      exemplos_items: deletadosItems.slice(0,3).map(i => i.titulo + ' (' + i.dataVenc + ')'),
+      total_coms: coms.length,
+      seriam_deletados_coms: deletadosComs.length,
+      exemplos_coms: deletadosComs.slice(0,3).map(c => c.titulo + ' (' + c.data + ')'),
+    };
+
+    resultados.cleanup = r;
+    el.innerHTML =
+      row('Total itens', r.total_items, 'val') +
+      row('Itens que seriam deletados', r.seriam_deletados_items, r.seriam_deletados_items > 0 ? 'warn' : 'ok') +
+      (r.exemplos_items.length ? `<pre>${r.exemplos_items.join('\n')}</pre>` : '') +
+      row('Total comunicados', r.total_coms, 'val') +
+      row('Comunicados que seriam deletados', r.seriam_deletados_coms, r.seriam_deletados_coms > 0 ? 'warn' : 'ok') +
+      (r.exemplos_coms.length ? `<pre>${r.exemplos_coms.join('\n')}</pre>` : '');
+
+    atualizarResultadoFinal();
+  } catch(e) {
+    el.innerHTML = `<span class="err">Erro: ${e.message}</span>`;
+  }
+}
+
+function testeComs() {
+  const el = document.getElementById('coms-result');
+  try {
+    const coms = JSON.parse(localStorage.getItem('mx4_coms') || '[]');
+    if(!coms.length) { el.innerHTML = '<span class="warn">Nenhum comunicado no localStorage.</span>'; return; }
+
+    // Detecta se data parece conteúdo (texto longo) ou data real (YYYY-MM-DD)
+    const comProblema = coms.filter(c => {
+      const dataPareceCont = c.data && c.data.length > 12; // datas são YYYY-MM-DD = 10 chars
+      const contVazia = !c.conteudo || c.conteudo.trim() === '';
+      return dataPareceCont || contVazia;
+    });
+
+    const r = {
+      total: coms.length,
+      com_problema_coluna: comProblema.length,
+      exemplos: comProblema.slice(0,3).map(c => ({
+        titulo: c.titulo,
+        data_valor: (c.data || '').slice(0,60),
+        conteudo_valor: (c.conteudo || '(vazio)').slice(0,60),
+      })),
+    };
+
+    resultados.coms = r;
+    el.innerHTML =
+      row('Total comunicados', r.total, 'val') +
+      row('Com problema de coluna data/conteudo', r.com_problema_coluna, r.com_problema_coluna > 0 ? 'err' : 'ok');
+
+    if(r.exemplos.length) {
+      el.innerHTML += '<pre>' + r.exemplos.map(e =>
+        `"${e.titulo}"\n  data: "${e.data_valor}"\n  conteudo: "${e.conteudo_valor}"`
+      ).join('\n\n') + '</pre>';
+    }
+
+    atualizarResultadoFinal();
+  } catch(e) {
+    el.innerHTML = `<span class="err">Erro: ${e.message}</span>`;
+  }
+}
+
+function testeConfig() {
+  const el = document.getElementById('config-result');
+  try {
+    const url = localStorage.getItem('mx4_sheetsUrl') || '';
+    const tok = localStorage.getItem('mx4_sheetsToken') || '';
+    const gem = localStorage.getItem('mx4_gemini') || '';
+    const sync = localStorage.getItem('mx4_sync') || '—';
+    const mostrarLidos = localStorage.getItem('mx4_mostrarLidos');
+
+    const r = {
+      sheets_url: url ? url.slice(0,50)+'...' : 'NÃO CONFIGURADO',
+      token: tok ? '✓ configurado (' + tok.length + ' chars)' : 'NÃO CONFIGURADO',
+      gemini: gem ? '✓ configurado (AIza...)' : 'NÃO CONFIGURADO',
+      ultimo_sync: sync,
+      mostrar_lidos: mostrarLidos,
+    };
+
+    resultados.config = r;
+    el.innerHTML =
+      row('Sheets URL', r.sheets_url ? 'OK' : 'FALTA', r.sheets_url.includes('script.google') ? 'ok' : 'err') +
+      row('Token', tok ? 'OK' : 'FALTA', tok ? 'ok' : 'warn') +
+      row('Gemini', gem ? 'OK' : 'FALTA', gem ? 'ok' : 'warn') +
+      row('Último sync', r.ultimo_sync, 'val');
+
+    atualizarResultadoFinal();
+  } catch(e) {
+    el.innerHTML = `<span class="err">Erro: ${e.message}</span>`;
+  }
+}
+
+function testePush() {
+  const el = document.getElementById('push-result');
+
+  // Verifica o código-fonte do app para detectar chamadas de push no init
+  const scriptContent = document.currentScript ? document.currentScript.textContent : '';
+
+  el.innerHTML = `
+    <div class="row"><span class="label">Este teste</span><span class="val">Abre o app em outra aba e verifica o comportamento</span></div>
+    <br>
+    <p style="font-size:12px;color:#6B5E4E">
+    Para verificar se o push está sendo chamado no init, abra o app 
+    (<a href="https://douglasfdias.github.io/maximus-agenda/" target="_blank">clique aqui</a>)
+    e após carregar, volte aqui e verifique se o último sync mudou (Teste 4).
+    </p>
+    <p style="font-size:12px;color:#C62828;margin-top:8px">
+    <strong>Sinal de problema:</strong> se o "último sync" mudar sozinho sem você ter tocado no 🔄, significa que o push está ocorrendo automaticamente no init.
+    </p>`;
+
+  resultados.push = { manual_check: 'ver instrucoes acima' };
+  atualizarResultadoFinal();
+}
+
+function atualizarResultadoFinal() {
+  const pre = document.getElementById('resultado-final');
+  pre.textContent = JSON.stringify(resultados, null, 2);
+}
+
+function copiarTudo() {
+  const texto = document.getElementById('resultado-final').textContent;
+  if(navigator.clipboard) {
+    navigator.clipboard.writeText(texto).then(()=>alert('✅ Copiado! Cole no chat.'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('✅ Copiado! Cole no chat.');
+  }
+}
+</script>
+</body>
+</html>
