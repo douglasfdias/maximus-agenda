@@ -1080,9 +1080,16 @@ function _renderSyncSetup(){
     <div class="fi"><label>Token de segurança</label>
       <input id="sync-token" type="password" value="${SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||''}"
         placeholder="A senha definida no SHEETS_TOKEN do Code.gs"></div>
-    <div style="display:flex;gap:10px">
-      <button onclick="closeAll()" class="btn bs" style="flex:1">Cancelar</button>
-      <button onclick="_saveSyncUrl()" class="btn bg2" style="flex:2">Salvar e testar</button>
+    <div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-top:4px;font-size:12px;color:var(--t2);line-height:1.6">
+      <strong>Como atualizar o app:</strong><br>
+      1. Suba o novo <code>index.html</code> no GitHub<br>
+      2. Incremente o VERSION no <code>sw.js</code> (ex: v5 → v6) e suba também<br>
+      3. Toque em "Verificar atualização" abaixo
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button onclick="closeAll()" class="btn bs" style="flex:1">Fechar</button>
+      <button onclick="verificarAtualizacao()" class="btn bs" style="flex:1;border-color:var(--grn);color:var(--grn)">🔄 Verificar atualização</button>
+      <button onclick="_saveSyncUrl()" class="btn bg2" style="flex:2">Salvar</button>
     </div>`);
 }
 
@@ -1629,42 +1636,88 @@ function delNota(id){
   DB.sn(S.notas);render();
 }
 
-// ══ PWA + UPDATE ═════════════════════════════════════
+// ══ PWA + ATUALIZAÇÃO AUTOMÁTICA ════════════════════
 let _swReg=null;
+
 if('serviceWorker' in navigator){
-  window.addEventListener('load',async()=>{
+  window.addEventListener('load', async()=>{
     try{
-      _swReg=await navigator.serviceWorker.register('sw.js');
-      // Verifica atualizações ao abrir
-      _swReg.addEventListener('updatefound',()=>{
-        const nw=_swReg.installing;
-        nw.addEventListener('statechange',()=>{
-          if(nw.state==='installed'&&navigator.serviceWorker.controller){
-            // Nova versão disponível — mostra banner
-            const bar=document.createElement('div');
-            bar.id='update-bar';
-            bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:#1565C0;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;font-family:Nunito,sans-serif;font-size:13px;font-weight:800';
-            bar.innerHTML='<span style="flex:1">🆕 Nova versão disponível!</span><button onclick="atualizarApp()" style="background:#fff;color:#1565C0;border:none;border-radius:8px;padding:6px 14px;font-family:Nunito,sans-serif;font-size:13px;font-weight:900;cursor:pointer">Atualizar agora</button>';
-            document.body.prepend(bar);
+      _swReg = await navigator.serviceWorker.register('sw.js');
+
+      // Quando um novo SW é encontrado (nova versão do app)
+      _swReg.addEventListener('updatefound', ()=>{
+        const sw = _swReg.installing;
+        sw.addEventListener('statechange', ()=>{
+          if(sw.state === 'installed'){
+            // Novo SW instalado — mostra banner de atualização
+            _mostrarBannerUpdate();
           }
         });
       });
-    }catch(e){}
+
+      // Se já há um SW esperando (ficou em standby), mostra banner imediatamente
+      if(_swReg.waiting) _mostrarBannerUpdate();
+
+      // Verifica atualização sempre que o app volta ao foco
+      document.addEventListener('visibilitychange', ()=>{
+        if(document.visibilityState === 'visible' && _swReg){
+          _swReg.update().catch(()=>{});
+        }
+      });
+
+    }catch(e){ console.warn('SW error:', e.message); }
   });
 }
 
-function atualizarApp(){
-  if(_swReg&&_swReg.waiting){
-    _swReg.waiting.postMessage({type:'SKIP_WAITING'});
-  }
-  window.location.reload();
+function _mostrarBannerUpdate(){
+  if(document.getElementById('update-bar')) return; // já está visível
+  const bar = document.createElement('div');
+  bar.id = 'update-bar';
+  bar.style.cssText = [
+    'position:fixed;top:0;left:0;right:0;z-index:9999',
+    'background:#1565C0;color:#fff',
+    'padding:12px 16px',
+    'display:flex;align-items:center;gap:10px',
+    'font-family:Nunito,sans-serif;font-size:13px;font-weight:800',
+    'box-shadow:0 2px 12px rgba(0,0,0,.3)',
+  ].join(';');
+  bar.innerHTML = `
+    <span style="font-size:18px">🆕</span>
+    <span style="flex:1">Nova versão disponível!</span>
+    <button onclick="atualizarApp()"
+      style="background:#fff;color:#1565C0;border:none;border-radius:8px;padding:7px 16px;font-family:Nunito,sans-serif;font-size:13px;font-weight:900;cursor:pointer">
+      Atualizar agora
+    </button>
+    <button onclick="this.parentElement.remove()"
+      style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:14px;cursor:pointer">
+      ✕
+    </button>`;
+  document.body.prepend(bar);
 }
 
-// Verificação manual de atualização (botão no header futuro)
-async function checkUpdate(){
-  if(!_swReg) return;
-  await _swReg.update();
-  alert('Verificação concluída. Se houver atualização, um aviso aparecerá no topo.');
+function atualizarApp(){
+  if(_swReg && _swReg.waiting){
+    _swReg.waiting.postMessage({type:'SKIP_WAITING'});
+  }
+  window.location.reload(true);
+}
+
+// Verifica manualmente — chamado pelo botão ⚙️
+async function verificarAtualizacao(){
+  if(!_swReg){
+    alert('Service Worker não registrado. Abra o app pelo navegador (não pelo ícone da tela inicial) para registrar.');
+    return;
+  }
+  try{
+    await _swReg.update();
+    if(_swReg.waiting){
+      _mostrarBannerUpdate();
+    } else {
+      alert('✅ O app já está na versão mais recente!');
+    }
+  }catch(e){
+    alert('Erro ao verificar: '+e.message);
+  }
 }
 
 init();
