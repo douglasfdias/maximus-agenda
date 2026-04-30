@@ -159,7 +159,7 @@ input,select,textarea{font-family:inherit}
 </div>
 <script>
 // ══ CONSTANTS ══════════════════════════════════════
-
+// Cole aqui a URL do seu Google Apps Script Web App (após configurar):
 const SHEETS_URL   = '';  // Ex: 'https://script.google.com/macros/s/XXXXXXX/exec'
 const SHEETS_TOKEN = '';  // A mesma senha definida no SHEETS_TOKEN do Code.gs
 
@@ -263,45 +263,41 @@ const S={
 
 function init(){
   S.items=DB.gi();S.notas=DB.gn();S.log=DB.gl();S.coms=DB.gc();
-  _autoCleanup(); // remove itens antigos ao abrir
+  _removerSampleData();
   renderHdr();render();updateBadge();
 }
 
-function _autoCleanup(){
-  const now=new Date(); now.setHours(0,0,0,0);
-  const DUAS_SEM=14*24*60*60*1000;
-  let changed=false;
-
-  // Itens concluídos há mais de 2 semanas
-  const novosItems=S.items.filter(i=>{
-    if(i.status!=='concluido') return true;
-    if(!i.dataVenc) return true;
-    const d=new Date(i.dataVenc+'T00:00:00');
-    return (now-d)<DUAS_SEM;
-  });
-  if(novosItems.length<S.items.length){
-    S.items=novosItems; DB.si(S.items); changed=true;
-    DB.log({type:'delete',msg:`Limpeza automática: ${S.items.length !== novosItems.length?'':''} tarefas concluídas removidas`});
-  }
-
-  // Comunicados: data passada há >2 semanas (exceto fixados)
-  const novosComs=S.coms.filter(c=>{
-    if(c.fixado) return true;
-    if(c.data){
-      const d=new Date(c.data+'T00:00:00');
-      return (now-d)<DUAS_SEM;
-    }
-    return true; // sem data: mantém (sem timestamp de criação)
-  });
-  if(novosComs.length<S.coms.length){
-    S.coms=novosComs; DB.sc(S.coms); changed=true;
-  }
-
-  if(changed && _sheetsUrl()) pushToSheets();
+// Remove itens de exemplo (s1-s5) que vêm pré-carregados
+function _removerSampleData(){
+  const SAMPLE_IDS=new Set(['s1','s2','s3','s4','s5']);
+  const antes=S.items.length;
+  S.items=S.items.filter(i=>!SAMPLE_IDS.has(i.id));
+  if(S.items.length<antes){ DB.si(S.items); }
 }
 
 // ══ HELPERS ════════════════════════════════════════
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+
+// Verifica se um item é candidato a exclusão (não deleta, só sinaliza)
+function isCandidatoExclusao(item){
+  const DUAS_SEM=14*24*60*60*1000;
+  const now=new Date(); now.setHours(0,0,0,0);
+  if(item.status==='concluido'&&item.dataVenc){
+    const d=new Date(item.dataVenc+'T00:00:00');
+    return (now-d)>=DUAS_SEM;
+  }
+  return false;
+}
+function isCandidatoComExclusao(com){
+  const DUAS_SEM=14*24*60*60*1000;
+  const now=new Date(); now.setHours(0,0,0,0);
+  if(com.fixado) return false;
+  if(com.data){
+    const d=new Date(com.data+'T00:00:00');
+    return (now-d)>=DUAS_SEM;
+  }
+  return false;
+}
 const fd=s=>{if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`};
 const ov=(dv,st)=>dv&&st!=='concluido'&&new Date(dv+'T23:59:59')<new Date();
 const gT=v=>TIPOS.find(t=>t.v===v)||TIPOS[0];
@@ -330,8 +326,8 @@ function cardHTML(item){
   const t=gT(item.tipo);
   return`<div class="card${o?' ov':''}" id="c-${item.id}">
     <!-- CABEÇALHO COLORIDO DA MATÉRIA -->
-    <div class="card-header" style="background:${mc.bg};border-bottom:1.5px solid ${mc.b}">
-      <span class="mat-label" style="color:${mc.c}">${item.materia}</span>
+    <div class="card-header" style="background:${mc.bg};border-bottom:1.5px solid ${mc.b}${isCandidatoExclusao(item)?';opacity:.65':''}">
+      <span class="mat-label" style="color:${mc.c}">${item.materia}${isCandidatoExclusao(item)?' 🕐':''}</span>
       <div class="card-actions">
         <button class="card-act-btn" onclick="openEdit('${item.id}')"
           onmouseenter="this.style.color='var(--isr)'" onmouseleave="this.style.color='var(--t3)'">✏️</button>
@@ -526,6 +522,7 @@ function renderTarefas(){
       <button class="tbtn${S.tmode==='kanban'?' on':''}" onclick="S.tmode='kanban';render()">🗂️ Kanban</button>
     </div>
     <button onclick="openBulk()" class="btn bs" style="padding:7px 10px;font-size:12px">📥</button>
+    <button onclick="openLimpeza()" class="btn bs" style="padding:7px 10px;font-size:12px" title="Limpeza em lote">🗑️</button>
   </div>
   <div style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch">
     ${selS('ft','fTipo',"S.fTipo=this.value;render()")}
@@ -893,17 +890,18 @@ function delCom(id){
 }
 
 // ══ MODALS ═══════════════════════════════════════════
-let _editId=null,_showForm=false,_showBulk=false,_showNota=false,_showSync=false,_showCom=false,_showImport=false,_showGemini=false,_comEditId=null;
+let _editId=null,_showForm=false,_showBulk=false,_showNota=false,_showSync=false,_showCom=false,_showImport=false,_showGemini=false,_showLimpeza=false,_comEditId=null;
 
 function renderModals(){
   document.querySelectorAll('.mo').forEach(m=>m.remove());
-  if(_showForm)   _renderItemForm();
-  if(_showBulk)   _renderBulk();
-  if(_showNota)   _renderNotaForm();
-  if(_showSync)   _renderSyncSetup();
-  if(_showCom)    _renderComForm();
-  if(_showImport) _renderImportForm();
-  if(_showGemini) _renderGeminiSetup();
+  if(_showForm)    _renderItemForm();
+  if(_showBulk)    _renderBulk();
+  if(_showNota)    _renderNotaForm();
+  if(_showSync)    _renderSyncSetup();
+  if(_showCom)     _renderComForm();
+  if(_showImport)  _renderImportForm();
+  if(_showGemini)  _renderGeminiSetup();
+  if(_showLimpeza) _renderLimpeza();
 }
 function openForm(){_editId=null;_showForm=true;renderModals()}
 function openEdit(id){_editId=id;_showForm=true;renderModals();document.querySelector('.md')?.scrollTo(0,0);}
@@ -911,10 +909,11 @@ function openBulk(){_showBulk=true;renderModals()}
 function openNota(){_showNota=true;renderModals()}
 function openSyncSetup(){_showSync=true;renderModals()}
 function openComForm(){_comEditId=null;_showCom=true;renderModals()}
+function openLimpeza(){_showLimpeza=true;renderModals()}
 function openComEdit(id){_comEditId=id;_showCom=true;renderModals()}
 function openComImport(){_showImport=true;renderModals()}
 function openGeminiSetup(){_showGemini=true;renderModals()}
-function closeAll(){_showForm=false;_showBulk=false;_showNota=false;_showSync=false;_showCom=false;_showImport=false;_showGemini=false;_editId=null;_comEditId=null;renderModals()}
+function closeAll(){_showForm=false;_showBulk=false;_showNota=false;_showSync=false;_showCom=false;_showImport=false;_showGemini=false;_showLimpeza=false;_editId=null;_comEditId=null;renderModals()}
 
 function _mo(inner){
   const el=document.createElement('div');
@@ -1086,11 +1085,14 @@ function _renderSyncSetup(){
       2. Incremente o VERSION no <code>sw.js</code> (ex: v5 → v6) e suba também<br>
       3. Toque em "Verificar atualização" abaixo
     </div>
-    <div style="display:flex;gap:10px;margin-top:12px">
-      <button onclick="closeAll()" class="btn bs" style="flex:1">Fechar</button>
-      <button onclick="verificarAtualizacao()" class="btn bs" style="flex:1;border-color:var(--grn);color:var(--grn)">🔄 Verificar atualização</button>
-      <button onclick="_saveSyncUrl()" class="btn bg2" style="flex:2">Salvar</button>
-    </div>`);
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button onclick="closeAll()" class="btn bs" style="flex:1;min-width:80px">Fechar</button>
+      <button onclick="verificarAtualizacao()" class="btn bs" style="flex:1;min-width:120px;border-color:var(--grn);color:var(--grn)">🔄 Verificar update</button>
+      <button onclick="_saveSyncUrl()" class="btn bg2" style="flex:2;min-width:120px">Salvar config</button>
+    </div>
+    <button onclick="closeAll();recarregarDaPlanilha()" class="btn" style="width:100%;margin-top:8px;background:var(--red);color:#fff;font-weight:800">
+      ⚠️ Recarregar TUDO da planilha (descarta dados locais)
+    </button>`);
 }
 
 function _saveSyncUrl(){
@@ -1474,6 +1476,78 @@ function _salvarTodos(total){
   }
 }
 
+function _renderLimpeza(){
+  const SAMPLE_IDS=new Set(['s1','s2','s3','s4','s5']);
+  const candItems=S.items.filter(i=>isCandidatoExclusao(i)&&!SAMPLE_IDS.has(i.id));
+  const candComs =S.coms.filter(c=>isCandidatoComExclusao(c));
+  const total=candItems.length+candComs.length;
+
+  const itemRow=(i,idx)=>{
+    const mc=gMC(i.materia);
+    return`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" data-id="${i.id}" data-type="item" checked style="width:18px;height:18px;accent-color:var(--red);flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i.titulo}</div>
+        <div style="font-size:11px;color:var(--t3)">${mc.c?'':''}<span style="background:${mc.bg};color:${mc.c};padding:1px 6px;border-radius:99px">${i.materia}</span> · ${fd(i.dataVenc)||'sem data'} · Concluído</div>
+      </div>
+    </label>`;
+  };
+
+  const comRow=(c,idx)=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
+    <input type="checkbox" data-id="${c.id}" data-type="com" checked style="width:18px;height:18px;accent-color:var(--red);flex-shrink:0">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.titulo}</div>
+      <div style="font-size:11px;color:var(--t3)">${c.etiqueta} · ${fd(c.data)||'sem data'}</div>
+    </div>
+  </label>`;
+
+  _mo(`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-weight:900;font-size:18px">🗑️ Limpeza em lote</span>
+      <button onclick="closeAll()" style="font-size:22px;color:var(--t3);padding:4px 8px;border-radius:9px">✕</button>
+    </div>
+
+    ${total===0
+      ? `<div style="text-align:center;padding:32px 0;color:var(--t3)">
+          <div style="font-size:40px;margin-bottom:10px">✨</div>
+          <div style="font-weight:700">Nenhum candidato a exclusão</div>
+          <div style="font-size:12px;margin-top:4px">Critérios: concluídos ou comunicados com data vencida há mais de 2 semanas</div>
+        </div>`
+      : `<div style="background:var(--redl);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:var(--red);line-height:1.6">
+          <strong>${total} candidato(s)</strong> identificado(s). Desmarque os que quiser manter antes de excluir.
+        </div>
+
+        ${candItems.length?`<div style="font-weight:900;font-size:12px;color:var(--t2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Tarefas concluídas (${candItems.length})</div>
+        ${candItems.map(itemRow).join('')}`:''}
+
+        ${candComs.length?`<div style="font-weight:900;font-size:12px;color:var(--t2);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px">Comunicados vencidos (${candComs.length})</div>
+        ${candComs.map(comRow).join('')}`:''}
+
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button onclick="closeAll()" class="btn bs" style="flex:1">Cancelar</button>
+          <button onclick="_executarLimpeza()" class="btn" style="flex:2;background:var(--red);color:#fff;font-weight:800">🗑️ Excluir selecionados</button>
+        </div>`
+    }`);
+}
+
+function _executarLimpeza(){
+  const checks=[...document.querySelectorAll('#app input[type=checkbox]:checked, .md input[type=checkbox]:checked')].filter(c=>c.dataset.id);
+  if(!checks.length){alert('Nenhum item selecionado.');return;}
+  if(!confirm(`Excluir ${checks.length} item(s)? Esta ação não pode ser desfeita.`)) return;
+
+  const idsItems=new Set(checks.filter(c=>c.dataset.type==='item').map(c=>c.dataset.id));
+  const idsComs =new Set(checks.filter(c=>c.dataset.type==='com').map(c=>c.dataset.id));
+
+  S.items=S.items.filter(i=>!idsItems.has(i.id));
+  S.coms =S.coms.filter(c=>!idsComs.has(c.id));
+  DB.si(S.items); DB.sc(S.coms);
+  DB.log({type:'delete',msg:`Limpeza manual: ${idsItems.size} tarefa(s) e ${idsComs.size} comunicado(s) excluído(s)`});
+  S.log=DB.gl();
+  closeAll();
+  render();updateBadge();
+  if(_sheetsUrl()) pushToSheets();
+}
+
 function _renderGeminiSetup(){
   const cur=GEMINI_KEY||DB.gk();
   _mo(`
@@ -1519,40 +1593,72 @@ async function pushToSheets(){
   }catch(e){ console.warn('Push failed silently:',e.message); }
 }
 
-// ── PULL completo: botão 🔄 — busca novidades da planilha ──
+// ── PULL completo: planilha = fonte de verdade ──
 async function syncSheets(){
   const url=_sheetsUrl();
   if(!url){alert('Configure a URL do Google Sheets primeiro (⚙️ no cabeçalho).');return;}
   S.syncing=true;renderHdr();
   try{
-    // PASSO 1: Envia estado local PRIMEIRO (garante que mudanças feitas no app não se perdem)
-    await pushToSheets();
-
-    // PASSO 2: Busca dados da planilha (novidades adicionadas pelo computador)
     const tok=SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||'';
+
+    // PASSO 1: Busca dados da planilha (fonte de verdade)
     const res=await fetch(url+'?action=get&token='+encodeURIComponent(tok),{redirect:'follow'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'Acesso negado. Verifique o token.');
 
-    // PASSO 3: Merge — local tem prioridade; só adiciona o que é NOVO na planilha
-    const merge=(local,remote)=>{
-      if(!remote||!remote.length) return local;
-      const localIds=new Set(local.map(i=>i.id).filter(Boolean));
-      const novos=remote.filter(i=>i.id&&!localIds.has(i.id)&&i.titulo&&i.titulo.trim());
-      return [...local,...novos];
+    const SAMPLE_IDS=new Set(['s1','s2','s3','s4','s5']);
+
+    // PASSO 2: Planilha ganha em tudo para itens existentes
+    // Somente itens locais com IDs que NÃO existem na planilha são mantidos (novos criados no app offline)
+    const mergeComPlanilha=(remoto, local)=>{
+      if(!remoto||!remoto.length) return local.filter(i=>!SAMPLE_IDS.has(i.id));
+      const remotIds=new Set(remoto.map(i=>i.id).filter(Boolean));
+      // Itens locais novos: têm ID, não são sample, não estão na planilha
+      const localNovos=local.filter(i=>i.id&&!SAMPLE_IDS.has(i.id)&&!remotIds.has(i.id)&&i.titulo&&i.titulo.trim());
+      return [...remoto, ...localNovos];
     };
-    S.items=merge(S.items, data.items||[]);
-    S.notas=merge(S.notas, data.notas||[]);
-    S.coms =merge(S.coms,  data.coms ||[]);
+
+    S.items=mergeComPlanilha(data.items||[], S.items);
+    S.notas=mergeComPlanilha(data.notas||[], S.notas);
+    S.coms =mergeComPlanilha(data.coms ||[], S.coms);
     DB.si(S.items); DB.sn(S.notas); DB.sc(S.coms);
+
+    // PASSO 3: Se havia itens locais novos, envia para a planilha
+    await pushToSheets();
 
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     DB.sSync(now);
     DB.log({type:'sync',msg:`Sincronizado com Sheets às ${now}`});
     S.log=DB.gl();
   }catch(e){
-    alert('Erro ao sincronizar:\n'+e.message+'\n\nDicas:\n• A URL está correta?\n• O Apps Script foi reimplantado após último código?\n• O SHEETS_TOKEN é o mesmo dos dois lados?');
+    alert('Erro ao sincronizar:\n'+e.message+'\n\nDicas:\n• A URL está correta?\n• O Apps Script foi reimplantado?\n• O token é o mesmo dos dois lados?');
+  }finally{
+    S.syncing=false;renderHdr();render();updateBadge();
+  }
+}
+
+// ── Recarregar tudo da planilha (descarta localStorage) ──
+async function recarregarDaPlanilha(){
+  const url=_sheetsUrl();
+  if(!url){alert('Sheets não configurado.');return;}
+  if(!confirm('Isso vai substituir TODOS os dados do app pelos dados da planilha.\nO que estiver só no app (não sincronizado) será perdido.\n\nConfirmar?')) return;
+  S.syncing=true;renderHdr();
+  try{
+    const tok=SHEETS_TOKEN||localStorage.getItem('mx4_sheetsToken')||'';
+    const res=await fetch(url+'?action=get&token='+encodeURIComponent(tok),{redirect:'follow'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'Acesso negado.');
+    S.items=data.items||[]; S.notas=data.notas||[]; S.coms=data.coms||[];
+    DB.si(S.items); DB.sn(S.notas); DB.sc(S.coms);
+    const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    DB.sSync(now);
+    DB.log({type:'sync',msg:`Recarregado da planilha às ${now}`});
+    S.log=DB.gl();
+    alert('✅ App atualizado com os dados da planilha!');
+  }catch(e){
+    alert('Erro: '+e.message);
   }finally{
     S.syncing=false;renderHdr();render();updateBadge();
   }
