@@ -1037,10 +1037,50 @@ const ConfigsScreen=({setScreen,onSync})=>{
   );
 };
 
+// ── Hook: detecta SW update ────────────────────────────────────
+const useSwUpdate = () => {
+  const [ready, setReady] = useState(window.__swUpdateReady || false);
+  useEffect(() => {
+    const handler = () => setReady(true);
+    document.addEventListener('swUpdateReady', handler);
+    return () => document.removeEventListener('swUpdateReady', handler);
+  }, []);
+  const applyUpdate = () => {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg && reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        window.location.reload();
+      }
+    });
+  };
+  return { ready, applyUpdate };
+};
+
+const UpdateBanner = ({ applyUpdate }) => (
+  <div className="slideUp" style={{
+    position:'fixed', top:0, left:0, right:0, zIndex:500,
+    background:'#1E3A5F', padding:'10px 16px',
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    boxShadow:'0 2px 12px rgba(0,0,0,.3)',
+  }}>
+    <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <span style={{fontSize:16}}>🆕</span>
+      <span style={{fontSize:13,fontWeight:600,color:'#fff'}}>Nova versão disponível</span>
+    </div>
+    <button onClick={applyUpdate} style={{
+      background:ACCENT, color:'#fff', border:'none',
+      borderRadius:20, padding:'6px 14px',
+      fontSize:12, fontWeight:700, cursor:'pointer',
+    }}>Atualizar</button>
+  </div>
+);
+
 // ═══════════════════════════════════════════════════════════════
 // APP ROOT
 // ═══════════════════════════════════════════════════════════════
 const App=()=>{
+  const {ready:swReady, applyUpdate}=useSwUpdate();
   const [screen,setScreen]=useState('home');
   const [itens,setItens]=useState([]);
   const [notas,setNotas]=useState([]);
@@ -1169,6 +1209,9 @@ const App=()=>{
 
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',background:'#f5f5f7',overflow:'hidden',position:'relative'}}>
+      {/* SW Update banner */}
+      {swReady&&<UpdateBanner applyUpdate={applyUpdate}/>}
+
       {/* Sync indicator */}
       {syncLoading&&(
         <div style={{position:'fixed',top:0,left:0,right:0,height:3,background:`${ACCENT}22`,zIndex:200}}>
@@ -1211,6 +1254,35 @@ const App=()=>{
 
 const root=ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App/>);
+</script>
+
+<script>
+// ── Service Worker: registro e detecção de atualização ──────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // Verifica atualização a cada vez que o app abre
+      reg.update();
+
+      // Quando uma nova versão do SW está esperando para ativar
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Há uma nova versão disponível — notifica o React
+            window.__swUpdateReady = true;
+            document.dispatchEvent(new CustomEvent('swUpdateReady'));
+          }
+        });
+      });
+    }).catch(err => console.warn('SW registro falhou:', err));
+
+    // Se o SW foi atualizado em outra aba, recarrega esta
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  });
+}
 </script>
 </body>
 </html>
