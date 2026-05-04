@@ -3,14 +3,14 @@
 //  Ao subir nova versão do app, incremente o número abaixo:
 //  v1 → v2 → v3 → ...
 // ══════════════════════════════════════════════════════════════════
-const VERSION = 'v9';
+const VERSION = 'v10';
 const CACHE = 'maximus-' + VERSION;
 const ASSETS = ['/maximus-agenda/', '/maximus-agenda/index.html', '/maximus-agenda/manifest.json'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(()=>{})));
-  // Não espera — instala imediatamente
-  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {})));
+  // NÃO chama skipWaiting aqui — fica em espera para o banner aparecer
+  // O skipWaiting só ocorre quando o usuário clica em "Atualizar"
 });
 
 self.addEventListener('activate', e => {
@@ -27,14 +27,14 @@ self.addEventListener('fetch', e => {
     fetch(e.request)
       .then(res => {
         const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(()=>{});
+        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
         return res;
       })
       .catch(() => caches.match(e.request))
   );
 });
 
-// Recebe mensagem para ativar nova versão imediatamente
+// Usuário clicou em "Atualizar" no banner — ativa o novo SW agora
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
