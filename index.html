@@ -139,35 +139,29 @@ async function apiFetch(params={}){
   const {apiUrl,token}=getConfig();
   const p=new URLSearchParams({token,...params});
   const url=`${apiUrl}?${p}`;
-  // Tenta fetch normal primeiro; se falhar por CORS/redirect usa XHR como fallback
-  const tryXHR = () => new Promise((resolve,reject)=>{
+  // Usa XMLHttpRequest diretamente — mais confiável com o redirect do Apps Script
+  // e não é interceptado pelo Service Worker para URLs cross-origin
+  return new Promise((resolve,reject)=>{
     const xhr=new XMLHttpRequest();
     xhr.open('GET',url,true);
     xhr.onload=()=>{
       try{
+        if(xhr.status===0&&xhr.responseText===''){
+          reject(new Error('Sem resposta do servidor. Verifique se o deploy está publicado como "Qualquer pessoa".'));
+          return;
+        }
         const json=JSON.parse(xhr.responseText);
         if(!json.ok) reject(new Error(json.erro||'Erro desconhecido'));
         else resolve(json);
-      }catch(e){reject(new Error('Resposta inválida do servidor'));}
+      }catch(e){
+        reject(new Error('Resposta inesperada: '+xhr.responseText.substring(0,80)));
+      }
     };
     xhr.onerror=()=>reject(new Error('Sem acesso ao servidor. Verifique a URL nas Configurações.'));
-    xhr.ontimeout=()=>reject(new Error('Timeout — servidor demorou demais.'));
+    xhr.ontimeout=()=>reject(new Error('Timeout (30s) — servidor demorou demais.'));
     xhr.timeout=30000;
     xhr.send();
   });
-  try{
-    const res=await fetch(url,{redirect:'follow'});
-    const text=await res.text();
-    if(!text||text.trim()==='') return tryXHR();
-    const json=JSON.parse(text);
-    if(!json.ok) throw new Error(json.erro||'Erro desconhecido');
-    return json;
-  }catch(e){
-    if(e.message==='Failed to fetch'||e.message.includes('NetworkError')||e.message.includes('fetch')){
-      return tryXHR();
-    }
-    throw e;
-  }
 }
 
 async function apiAdd(aba,dados){
@@ -1200,7 +1194,8 @@ const App=()=>{
         <span style={{fontSize:48,marginBottom:16}}>⚠️</span>
         <h2 style={{fontSize:18,fontWeight:800,color:'#111',marginBottom:8}}>Erro ao carregar</h2>
         <p style={{fontSize:13,color:'#888',marginBottom:20,lineHeight:1.6}}>{error}</p>
-        <p style={{fontSize:12,color:'#aaa',marginBottom:20}}>Verifique a URL do Apps Script e o token nas Configurações.</p>
+        <p style={{fontSize:12,color:'#aaa',marginBottom:4}}>Verifique a URL do Apps Script e o token nas Configurações.</p>
+        <p style={{fontSize:11,color:'#ccc',marginBottom:20}}>⚠️ Ao reinstalar o app, as configurações são apagadas e precisam ser refeitas.</p>
         <button onClick={()=>fetchData()} style={{padding:'12px 28px',background:ACCENT,color:'#fff',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',marginBottom:10}}>Tentar novamente</button>
         <button onClick={()=>{setError(null);setScreen('configs');}} style={{padding:'12px 28px',background:'#fff',color:'#555',border:'1.5px solid #e0e0e0',borderRadius:12,fontSize:14,fontWeight:600,cursor:'pointer'}}>Abrir Configurações</button>
       </div>
