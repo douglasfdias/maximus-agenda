@@ -3,7 +3,7 @@
 //  Ao subir nova versão do app, incremente o número abaixo:
 //  v1 → v2 → v3 → ...
 // ══════════════════════════════════════════════════════════════════
-const VERSION = 'v10';
+const VERSION = 'v11';
 const CACHE = 'maximus-' + VERSION;
 const ASSETS = ['/maximus-agenda/', '/maximus-agenda/index.html', '/maximus-agenda/manifest.json'];
 
@@ -23,6 +23,10 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Ignora requisições cross-origin (Apps Script, Google APIs, fontes, etc.)
+  // O SW só cuida dos assets do próprio app
+  if (!e.request.url.startsWith(self.location.origin)) return;
+
   e.respondWith(
     fetch(e.request)
       .then(res => {
