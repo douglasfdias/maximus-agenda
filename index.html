@@ -27,7 +27,7 @@ button{-webkit-appearance:none;appearance:none}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .fade{animation:fadeIn .2s ease both}
 .slideUp{animation:slideUp .25s cubic-bezier(.4,0,.2,1) both}
-.slideRight{animation:slideInRight .22s cubic-bezier(.4,0,.2,1) both}
+.slideRight{animation:slideRight .22s cubic-bezier(.4,0,.2,1) both}
 .pulse{animation:pulse 1.5s ease infinite}
 </style>
 </head>
@@ -538,8 +538,8 @@ const TasksScreen=({itens,onToggle,onEdit,onDelete,initialFilter={}})=>{
       </div>
 
       {showFilters&&<div style={{background:'#fff',borderRadius:14,padding:12,marginBottom:8,boxShadow:'0 1px 4px rgba(0,0,0,.06)',display:'flex',flexDirection:'column',gap:8}}>
-        <div style={{display:'flex',gap:6'}}>
-          <div style={{flex:1}}><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>FILHO</p><div style={{display:'flex',gap:4'}}>{[['all','Todos'],['iza','Iza'],['israel','Israel']].map(([v,l])=><button key={v} onClick={()=>setFilho(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:filho===v?ACCENT:'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:filho===v?'#fff':'#888'}}>{l}</button>)}</div></div>
+        <div style={{display:'flex',gap:6}}>
+          <div style={{flex:1}}><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>FILHO</p><div style={{display:'flex',gap:4}}>{[['all','Todos'],['iza','Iza'],['israel','Israel']].map(([v,l])=><button key={v} onClick={()=>setFilho(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:filho===v?ACCENT:'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:filho===v?'#fff':'#888'}}>{l}</button>)}</div></div>
           <div style={{flex:1}}><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>STATUS</p><div style={{display:'flex',gap:4}}>{[['pendente','Pendente'],['concluido','Concluído']].map(([v,l])=><button key={v} onClick={()=>setStatusF(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:statusF===v?'#111':'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:statusF===v?'#fff':'#888'}}>{l}</button>)}</div></div>
         </div>
         <div><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>ETAPA</p><div style={{display:'flex',gap:4}}>{[['all','Todas'],['1','1ª'],['2','2ª'],['3','3ª']].map(([v,l])=><button key={v} onClick={()=>setEtapaF(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:etapaF===v?'#1E3A5F':'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:etapaF===v?'#fff':'#888'}}>{l}</button>)}</div></div>
