@@ -57,7 +57,21 @@ const SUB={
   'prod. de texto':{color:'#6366F1',bg:'#EEF2FF',label:'Prod. de Texto'},
   'soc. emocional':{color:'#9333EA',bg:'#F3E8FF',label:'Soc. Emocional'},
 };
-function getSub(m){return SUB[String(m||'').toLowerCase().trim()]||{color:'#888',bg:'#f0f0f2',label:m||'—'};}
+function getSub(m){
+  const s=String(m||'').toLowerCase().trim()
+    .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
+    .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
+    .replace(/[ùúûü]/g,'u').replace(/ç/g,'c').replace(/ñ/g,'n')
+    .replace('educacao fisica','ed. fisica')
+    .replace('educação física','ed. fisica')
+    .replace('lingua portuguesa','portugues')
+    .replace('língua portuguesa','portugues')
+    .replace('producao de texto','prod. de texto')
+    .replace('prod. texto','prod. de texto')
+    .replace('soc. emocional','soc. emocional')
+    .replace('socioemocional','soc. emocional');
+  return SUB[s]||{color:'#888',bg:'#f0f0f2',label:m||'—'};
+}
 
 const ETIQ={
   'escola':{c:'#3B82F6',bg:'#EFF6FF',e:'🏫',label:'Escola'},
@@ -147,10 +161,22 @@ const useSwUpdate=()=>{
 function useLongPress(onTap,onLong,delay=500){
   const timer=useRef(null);
   const fired=useRef(false);
+  const startPos=useRef({x:0,y:0});
+  const cancel=()=>clearTimeout(timer.current);
   return{
-    onTouchStart:()=>{fired.current=false;timer.current=setTimeout(()=>{fired.current=true;onLong();},delay);},
-    onTouchEnd:()=>{clearTimeout(timer.current);if(!fired.current)onTap();},
-    onTouchMove:()=>clearTimeout(timer.current),
+    onTouchStart:(e)=>{
+      fired.current=false;
+      const t=e.touches[0];
+      startPos.current={x:t.clientX,y:t.clientY};
+      timer.current=setTimeout(()=>{fired.current=true;onLong();},delay);
+    },
+    onTouchMove:(e)=>{
+      const t=e.touches[0];
+      const dx=Math.abs(t.clientX-startPos.current.x);
+      const dy=Math.abs(t.clientY-startPos.current.y);
+      if(dx>8||dy>8)cancel();
+    },
+    onTouchEnd:()=>{cancel();if(!fired.current)onTap();},
     onContextMenu:(e)=>e.preventDefault(),
   };
 }
@@ -300,7 +326,7 @@ const AddEditModal=({item,onClose,onSave,loading})=>{
           </div>
           <div><label style={lbl}>Remetente</label><input style={inp} value={comForm.remetente} onChange={e=>setCom('remetente',e.target.value)} placeholder="Ex: Profª Bruna"/></div>
           <div><label style={lbl}>Data</label><input style={inp} type="date" value={toISO(comForm.data)} onChange={e=>setCom('data',fromISO(e.target.value))}/></div>
-          <div><label style={lbl}>Conteúdo</label><textarea style={{...inp,resize:'none',minHeight:80}} value={comForm.conteudo} onChange={e=>setCom('conteudo',e.target.value)} placeholder="Mensagem..."/></div>
+          <div><label style={lbl}>Conteúdo</label><textarea style={{...inp,resize:'none',minHeight:130}} value={comForm.conteudo} onChange={e=>setCom('conteudo',e.target.value)} placeholder="Mensagem..."/></div>
         </>)}
       </div>
       <div style={{padding:'16px 20px 0'}}>
@@ -394,7 +420,7 @@ const ItemDetalhe=({item,onClose,onEdit,onDelete})=>{
 // ═══════════════════════════════════════════════════════════════
 // HOME SCREEN
 // ═══════════════════════════════════════════════════════════════
-const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA})=>{
+const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA,onItemPress})=>{
   const [filho,setFilho]=useState('all');
   const now=new Date();now.setHours(0,0,0,0);
   const hojeStr=hoje();
@@ -417,7 +443,7 @@ const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA})=>{
   const dateCard=(item)=>{
     const s=getSub(item.materia);
     const d=parseDate(item.dataVenc);
-    return<div key={item.id} style={{background:'#fff',borderRadius:14,padding:'11px 13px',marginBottom:7,display:'flex',alignItems:'center',gap:12,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+    return<div key={item.id} onClick={()=>onItemPress&&onItemPress(item)} style={{background:'#fff',borderRadius:14,padding:'11px 13px',marginBottom:7,display:'flex',alignItems:'center',gap:12,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer'}}>
       <div style={{width:40,height:40,borderRadius:12,background:s.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
         <span style={{fontSize:13,fontWeight:800,color:s.color,lineHeight:1}}>{d.getDate()}</span>
         <span style={{fontSize:8,color:s.color,opacity:.7,fontWeight:600}}>{MESES_ABR[d.getMonth()]}</span>
@@ -459,7 +485,7 @@ const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA})=>{
           <div style={{background:'rgba(255,255,255,.3)',borderRadius:99,height:6}}><div style={{width:filtrados.length>0?`${Math.min(100,Math.round(atrasados.length/filtrados.length*100))}%`:'0%',height:'100%',background:'rgba(255,80,80,.8)',borderRadius:99}}/></div>
         </div>
         <button onClick={e=>{e.stopPropagation();onWA();}} style={{background:'rgba(255,255,255,.2)',border:'none',borderRadius:16,padding:'10px 12px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-          <span style={{fontSize:22}}>📲</span><span style={{fontSize:9,fontWeight:700,color:'#fff'}}>WhatsApp</span>
+          {waLoading?<div style={{width:22,height:22,border:'2px solid rgba(255,255,255,.4)',borderTop:'2px solid #fff',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>:<span style={{fontSize:22}}>📲</span>}<span style={{fontSize:9,fontWeight:700,color:'#fff'}}>{waLoading?'Abrindo…':'WhatsApp'}</span>
         </button>
       </div>
 
@@ -480,7 +506,7 @@ const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA})=>{
 
       {/* Para hoje */}
       <SectionTitle count={paraHoje.length}>📌 Para hoje</SectionTitle>
-      {paraHoje.length===0?<div style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}><p style={{color:'#aaa',fontSize:13}}>Nada para hoje 🎉</p></div>:paraHoje.map(item=><div key={item.id} style={{background:'#fff',borderRadius:14,padding:'11px 13px',marginBottom:7,display:'flex',alignItems:'center',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',borderLeft:`3px solid ${getSub(item.materia).color}`}}>
+      {paraHoje.length===0?<div style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}><p style={{color:'#aaa',fontSize:13}}>Nada para hoje 🎉</p></div>:paraHoje.map(item=><div key={item.id} onClick={()=>onItemPress&&onItemPress(item)} style={{background:'#fff',borderRadius:14,padding:'11px 13px',marginBottom:7,display:'flex',alignItems:'center',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',borderLeft:`3px solid ${getSub(item.materia).color}`,cursor:'pointer'}}>
         <div style={{flex:1,minWidth:0}}><p style={{fontSize:13,fontWeight:600,color:'#111',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.titulo}</p><div style={{display:'flex',gap:5,alignItems:'center'}}><SubChip materia={item.materia} small/><Avatar owner={item.filho} size={16}/></div></div>
       </div>)}
 
@@ -644,6 +670,7 @@ const AvisosScreen=({comunicados,setComunicados,onArchive,onDelete,onEdit})=>{
   const [filho,setFilho]=useState('ambos');
   const [etiq,setEtiq]=useState('todos');
   const [verArq,setVerArq]=useState(false);
+  const [selected,setSelected]=useState(new Set());
 
   const markLido=id=>setComunicados(cs=>cs.map(c=>c.id===id?{...c,_lido:true}:c));
 
@@ -705,11 +732,23 @@ const AvisosScreen=({comunicados,setComunicados,onArchive,onDelete,onEdit})=>{
     </div>
     <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
       {filtered.length===0&&<EmptyState emoji={verArq?'📦':'🔕'} msg={verArq?'Nenhum comunicado arquivado':'Nenhum aviso encontrado'}/>}
-      {filtered.map(item=>{
+      {/* Multi-select bar */}
+      {selected.size>0&&<div style={{position:'sticky',top:0,zIndex:10,background:'#fff',borderRadius:12,padding:'10px 14px',marginBottom:8,display:'flex',alignItems:'center',gap:8,boxShadow:'0 2px 8px rgba(0,0,0,.1)',margin:'0 0 8px 0'}}>
+        <span style={{fontSize:13,fontWeight:700,color:'#111',flex:1}}>{selected.size} selecionado(s)</span>
+        <button onClick={()=>{selected.forEach(id=>onArchive(id));setSelected(new Set());}} style={{background:'#FFF7ED',border:'none',borderRadius:10,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:700,color:'#D97706'}}>📦 Arquivar</button>
+        <button onClick={()=>{if(window.confirm(`Excluir ${selected.size} item(ns)?`)){selected.forEach(id=>onDelete(id));setSelected(new Set());}}} style={{background:'#FEF2F2',border:'none',borderRadius:10,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:700,color:'#DC2626'}}>🗑 Excluir</button>
+        <button onClick={()=>setSelected(new Set())} style={{background:'#f0f0f2',border:'none',borderRadius:8,padding:'7px 8px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#888'}}>✕</button>
+      </div>}
+            {filtered.map(item=>{
         const t=getEtiq(item.etiqueta);
         const isUrg=item.etiqueta==='urgente';
-        return<div key={item.id} onClick={()=>{markLido(item.id);setDetail(item);}} style={{background:isUrg?'#FEF2F2':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',border:isUrg?'1.5px solid #DC2626':'1.5px solid transparent'}}>
-          {!item._lido&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:isUrg?'#DC2626':ACCENT}}/>}
+        const isSel=selected.has(item.id);
+        const lp=useLongPress(()=>{markLido(item.id);setDetail(item);},()=>setSelected(s=>{const n=new Set(s);n.add(item.id);return n;}));
+        return<div key={item.id} {...lp} style={{background:isSel?'#EEF2FF':isUrg?'#FEF2F2':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',border:isSel?`1.5px solid ${ACCENT}`:isUrg?'1.5px solid #DC2626':'1.5px solid transparent',transition:'background .15s'}}>
+          {!item._lido&&!isSel&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:isUrg?'#DC2626':ACCENT}}/>}
+          {selected.size>0&&<div onClick={e=>{e.stopPropagation();setSelected(s=>{const n=new Set(s);isSel?n.delete(item.id):n.add(item.id);return n;});}} style={{width:22,height:22,borderRadius:11,border:`2px solid ${isSel?ACCENT:'#ccc'}`,background:isSel?ACCENT:'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'center'}}>
+            {isSel&&<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="2,5 4,7.5 8,2.5" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round"/></svg>}
+          </div>}
           <div style={{width:36,height:36,borderRadius:10,background:t.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,position:'relative'}}>
             <span style={{fontSize:16}}>{t.e}</span>
             {isUrg&&<div className="pulse" style={{position:'absolute',top:-2,right:-2,width:8,height:8,borderRadius:4,background:'#DC2626',border:'2px solid #FEF2F2'}}/>}
@@ -722,6 +761,7 @@ const AvisosScreen=({comunicados,setComunicados,onArchive,onDelete,onEdit})=>{
             <p style={{fontSize:13,fontWeight:item._lido?500:700,color:isUrg?'#7F1D1D':'#111',marginBottom:2,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.titulo}</p>
             <p style={{fontSize:11,color:'#aaa',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.remetente||item.filho}</p>
           </div>
+          {selected.size===0&&<button onClick={e=>{e.stopPropagation();onArchive(item.id);}} style={{background:'transparent',border:'none',padding:'4px 2px',cursor:'pointer',opacity:.35,flexShrink:0,fontSize:15,alignSelf:'center'}}>📦</button>}
         </div>;
       })}
     </div>
@@ -796,13 +836,13 @@ const BoletimScreen=({notas,setScreen})=>{
                 <span style={{fontSize:11,color:'#888',fontWeight:500}}>{av.etapa}ª</span>
                 <div>
                   <span style={{fontSize:11,color:'#333',fontWeight:500}}>{av.atividade}</span>
-                  {av.valor_atividade&&<span style={{fontSize:9,color:'#bbb',marginLeft:4}}>[{av.valor_atividade}]</span>}
+                  {av.valor_atividade&&<span style={{fontSize:9,color:'#bbb',marginLeft:4}}>[{!isNaN(parseFloat(av.valor_atividade))?parseFloat(av.valor_atividade).toFixed(2):av.valor_atividade}]</span>}
                 </div>
-                <span style={{fontSize:13,fontWeight:700,color:notaCor(av.nota,parseFloat(av.valor_atividade||0),etapa),textAlign:'right'}}>{av.nota||'—'}</span>
+                <span style={{fontSize:13,fontWeight:700,color:notaCor(av.nota,parseFloat(av.valor_atividade||0),etapa),textAlign:'right'}}>{av.nota&&!isNaN(parseFloat(av.nota))?parseFloat(av.nota).toFixed(2):av.nota||'—'}</span>
               </div>)}
               {numNotas.length>0&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 16px',background:'#F8FAFF',borderBottom:'2px solid #e8edf5'}}>
                 <span style={{fontSize:11,fontWeight:600,color:'#888'}}>Total {etapa}ª etapa · mín. {media}/{max}</span>
-                <span style={{fontSize:14,fontWeight:800,color:totalOk?'#16A34A':'#DC2626'}}>{total.toFixed(2)}{!totalOk&&' ⚠'}</span>
+                <span style={{fontSize:14,fontWeight:800,color:totalOk?'#16A34A':'#DC2626'}}>{total.toFixed(2)} / {max}{!totalOk&&' ⚠'}</span>
               </div>}
             </div>;
           })}
@@ -1016,6 +1056,7 @@ const App=()=>{
   const [confirm,setConfirm]=useState(null);
   const [longPress,setLongPress]=useState(null);
   const [tasksFilter,setTasksFilter]=useState({});
+  const [homeDetail,setHomeDetail]=useState(null);
   const {ready:swReady,apply:applyUpdate}=useSwUpdate();
 
   const showToast=(msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),2500);};
@@ -1085,7 +1126,10 @@ const App=()=>{
     }});
   };
 
+  const [waLoading,setWaLoading]=useState(false);
   const handleWA=async()=>{
+    if(waLoading)return;
+    setWaLoading(true);
     const {wa}=getConfig();
     try{
       const data=await apiGet();
@@ -1101,7 +1145,7 @@ const App=()=>{
       proximos.forEach(i=>{const d=parseDate(i.dataVenc);const mes=MESES[d.getMonth()];if(mes!==mesAtual){t+=`\n🗓️ ${mes.toUpperCase()}\n`;mesAtual=mes;}t+=`${i.tipo==='prova'?'📝':'📌'} ${DIAS[d.getDay()]} ${i.dataVenc} — ${i.titulo} (${getSub(i.materia).label}) · ${i.filho}\n`;});
       if(!atrasados.length&&!semData.length&&!proximos.length)t+='✅ Nada pendente!';
       window.open(`https://wa.me/${wa||''}?text=${encodeURIComponent(t)}`,'_blank');
-    }catch(e){showToast('Erro ao gerar resumo','err');}
+    }catch(e){showToast('Erro ao gerar resumo','err');}finally{setWaLoading(false);}
   };
 
   const navScreens=['home','tasks','calendar','avisos'];
@@ -1131,7 +1175,7 @@ const App=()=>{
     {syncLoading&&<div style={{position:'fixed',top:0,left:0,right:0,height:3,background:`${ACCENT}22`,zIndex:200}}><div style={{height:'100%',background:ACCENT,width:'70%',transition:'width .5s'}}/></div>}
 
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',paddingTop:swReady?40:0}}>
-      {screen==='home'&&<HomeScreen itens={itens} comunicados={comunicados} setScreen={handleSetScreen} setTasksFilter={setTasksFilter} onWA={handleWA}/>}
+      {screen==='home'&&(homeDetail?<ItemDetalhe item={homeDetail} onClose={()=>setHomeDetail(null)} onEdit={item=>{setHomeDetail(null);setEditItem(item);setShowAdd(true);}} onDelete={item=>{setHomeDetail(null);handleDeleteItem(item);}}/>:<HomeScreen itens={itens} comunicados={comunicados} setScreen={handleSetScreen} setTasksFilter={setTasksFilter} onWA={handleWA} onItemPress={item=>setHomeDetail(item)}/>)}
       {screen==='tasks'&&<TasksScreen itens={itens} onToggle={handleToggle} onEdit={item=>{setEditItem(item);setShowAdd(true);}} onDelete={handleDeleteItem} initialFilter={tasksFilter}/>}
       {screen==='calendar'&&<CalendarScreen itens={itens} onEdit={item=>{setEditItem(item);setShowAdd(true);}} onDelete={handleDeleteItem}/>}
       {screen==='avisos'&&<AvisosScreen comunicados={comunicados} setComunicados={setComunicados} onArchive={handleArchiveCom} onDelete={handleDeleteCom} onEdit={item=>{setEditItem(item);setShowAdd(true);}}/>}
