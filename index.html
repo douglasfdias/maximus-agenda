@@ -2,10 +2,9 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f5f7">
 <title>Agenda Máximus</title>
 <link rel="manifest" href="manifest.json">
@@ -22,12 +21,14 @@ html,body{height:100%;overflow:hidden;background:#f5f5f7;font-family:'Plus Jakar
 input,select,textarea{font-family:inherit}
 button{-webkit-appearance:none;appearance:none}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-@keyframes slideInRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .fade{animation:fadeIn .2s ease both}
 .slideUp{animation:slideUp .25s cubic-bezier(.4,0,.2,1) both}
 .slideRight{animation:slideInRight .22s cubic-bezier(.4,0,.2,1) both}
+.pulse{animation:pulse 1.5s ease infinite}
 </style>
 </head>
 <body>
@@ -35,48 +36,48 @@ button{-webkit-appearance:none;appearance:none}
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback,useMemo}=React;
 
-// ─── CONFIGURAÇÕES PADRÃO ──────────────────────────────────────
-const DEFAULT_API = 'https://script.google.com/macros/s/AKfycbz6xUTGCrUvTK617km2aNzJJ_akVrTKugqOTe-TaphuDZnDaK3nRFTDu-SlNVZLRVnu0Q/exec';
-const ACCENT  = '#F97316';
-const IZA_C   = '#EC4899';
-const ISRAEL_C= '#3B82F6';
+// ─── CONSTANTS ────────────────────────────────────────────────
+const DEFAULT_API='https://script.google.com/macros/s/AKfycbz6xUTGCrUvTK617km2aNzJJ_akVrTKugqOTe-TaphuDZnDaK3nRFTDu-SlNVZLRVnu0Q/exec';
+const ACCENT='#F97316',IZA_C='#EC4899',ISRAEL_C='#3B82F6';
+const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MESES_ABR=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const DIAS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const DIAS_LONG=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 
-// ─── SUBJECTS MAP (por nome normalizado) ──────────────────────
-const SUB = {
-  'matemática':         {color:'#3B82F6',bg:'#EFF6FF',label:'Matemática'},
-  'português':          {color:'#16A34A',bg:'#F0FDF4',label:'Português'},
-  'língua portuguesa':  {color:'#16A34A',bg:'#F0FDF4',label:'Português'},
-  'lingua portuguesa':  {color:'#16A34A',bg:'#F0FDF4',label:'Português'},
-  'inglês':             {color:'#7C3AED',bg:'#F5F3FF',label:'Inglês'},
-  'ingles':             {color:'#7C3AED',bg:'#F5F3FF',label:'Inglês'},
-  'ciências':           {color:'#0891B2',bg:'#ECFEFF',label:'Ciências'},
-  'ciencias':           {color:'#0891B2',bg:'#ECFEFF',label:'Ciências'},
-  'história':           {color:'#D97706',bg:'#FFFBEB',label:'História'},
-  'historia':           {color:'#D97706',bg:'#FFFBEB',label:'História'},
-  'geografia':          {color:'#059669',bg:'#ECFDF5',label:'Geografia'},
-  'arte':               {color:'#DB2777',bg:'#FDF2F8',label:'Arte'},
-  'artes':              {color:'#DB2777',bg:'#FDF2F8',label:'Arte'},
-  'ed. física':         {color:'#EA580C',bg:'#FFF7ED',label:'Ed. Física'},
-  'ed.física':          {color:'#EA580C',bg:'#FFF7ED',label:'Ed. Física'},
-  'educação física':    {color:'#EA580C',bg:'#FFF7ED',label:'Ed. Física'},
-  'educacao fisica':    {color:'#EA580C',bg:'#FFF7ED',label:'Ed. Física'},
-  'soc. emocional':     {color:'#9333EA',bg:'#F3E8FF',label:'Soc. Emocional'},
-  'socioemocional':     {color:'#9333EA',bg:'#F3E8FF',label:'Soc. Emocional'},
-  'prod. de texto':     {color:'#6366F1',bg:'#EEF2FF',label:'Prod. de Texto'},
-  'produção de texto':  {color:'#6366F1',bg:'#EEF2FF',label:'Prod. de Texto'},
-  'producao de texto':  {color:'#6366F1',bg:'#EEF2FF',label:'Prod. de Texto'},
-  'prod. texto':        {color:'#6366F1',bg:'#EEF2FF',label:'Prod. de Texto'},
-  'filosofia':          {color:'#0E7490',bg:'#ECFEFF',label:'Filosofia'},
-  'religião':           {color:'#BE185D',bg:'#FDF2F8',label:'Religião'},
-  'religiao':           {color:'#BE185D',bg:'#FDF2F8',label:'Religião'},
+const SUB={
+  'matematica':{color:'#3B82F6',bg:'#EFF6FF',label:'Matemática'},
+  'portugues':{color:'#16A34A',bg:'#F0FDF4',label:'Português'},
+  'ciencias':{color:'#0891B2',bg:'#ECFEFF',label:'Ciências'},
+  'historia':{color:'#D97706',bg:'#FFFBEB',label:'História'},
+  'geografia':{color:'#059669',bg:'#ECFDF5',label:'Geografia'},
+  'ingles':{color:'#7C3AED',bg:'#F5F3FF',label:'Inglês'},
+  'arte':{color:'#DB2777',bg:'#FDF2F8',label:'Arte'},
+  'ed. fisica':{color:'#EA580C',bg:'#FFF7ED',label:'Ed. Física'},
+  'filosofia':{color:'#0E7490',bg:'#ECFEFF',label:'Filosofia'},
+  'prod. de texto':{color:'#6366F1',bg:'#EEF2FF',label:'Prod. de Texto'},
+  'soc. emocional':{color:'#9333EA',bg:'#F3E8FF',label:'Soc. Emocional'},
 };
-function getSub(m){return SUB[(m||'').toLowerCase().trim()]||{color:'#888',bg:'#f5f5f7',label:m||'—'};}
+function getSub(m){return SUB[String(m||'').toLowerCase().trim()]||{color:'#888',bg:'#f0f0f2',label:m||'—'};}
 
-// ─── HORÁRIOS ─────────────────────────────────────────────────
-const HORARIOS = {
-  iza:{
-    turma:'6° Ano A',periodo:'Manhã',
-    faixas:['07h10','08h00','RECREIO','09h10','10h00','10h50','11h40'],
+const ETIQ={
+  'escola':{c:'#3B82F6',bg:'#EFF6FF',e:'🏫',label:'Escola'},
+  'professor':{c:'#16A34A',bg:'#F0FDF4',e:'👩‍🏫',label:'Professor(a)'},
+  'evento':{c:'#D97706',bg:'#FFFBEB',e:'📅',label:'Evento'},
+  'financeiro':{c:'#DC2626',bg:'#FEF2F2',e:'💰',label:'Financeiro'},
+  'saude':{c:'#0891B2',bg:'#ECFEFF',e:'🩺',label:'Saúde'},
+  'aviso':{c:'#6366F1',bg:'#EEF2FF',e:'📢',label:'Aviso'},
+  'urgente':{c:'#DC2626',bg:'#FEF2F2',e:'🚨',label:'Urgente'},
+};
+function getEtiq(e){return ETIQ[String(e||'').toLowerCase().trim()]||{c:'#888',bg:'#f0f0f2',e:'📌',label:e||'—'};}
+
+const MATERIAS_ALL=['matematica','portugues','ciencias','historia','geografia','ingles','arte','ed. fisica','filosofia','prod. de texto','soc. emocional'];
+const TIPOS_ITEM=['tarefa','prova','trabalho','atividade','evento'];
+const ETAPAS=['1','2','3'];
+const ETIQUETAS_COM=['escola','professor','evento','financeiro','saude','aviso','urgente'];
+
+const HORARIOS={
+  iza:{turma:'6° Ano A',periodo:'Manhã',
+    faixas:['07h10–08h00','08h00–08h50','RECREIO','09h10–10h00','10h00–10h50','10h50–11h40','11h40–12h30'],
     grade:[
       ['Arte','Ciências','Soc. Emocional','Português','Prod. de Texto'],
       ['Geografia','Geografia','Português','Ed. Física','Geografia'],
@@ -87,9 +88,8 @@ const HORARIOS = {
       [null,'Inglês',null,null,null],
     ]
   },
-  israel:{
-    turma:'2° Ano A',periodo:'Tarde',
-    faixas:['13h00','13h50','RECREIO','15h00','15h50','16h40'],
+  israel:{turma:'2° Ano A',periodo:'Tarde',
+    faixas:['13h00–13h50','13h50–14h40','RECREIO','15h00–15h50','15h50–16h40','16h40–17h30'],
     grade:[
       ['Português','Inglês','Matemática','Português','Arte'],
       ['Português','Ed. Física','Matemática','Português','Ed. Física'],
@@ -101,716 +101,631 @@ const HORARIOS = {
   }
 };
 
-// ─── HELPERS DE DATA ───────────────────────────────────────────
-const DIAS_PT   =['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-const MESES_PT  =['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const MESES_ABR =['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
-function hoje(){
-  const d=new Date();
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-}
-function parseDate(s){
-  if(!s)return null;
-  const p=s.split('/');
-  if(p.length!==3)return null;
-  return new Date(p[2],p[1]-1,p[0]);
-}
-function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+// ─── DATE HELPERS ─────────────────────────────────────────────
 function fmtDate(d){return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;}
-function isHoje(s){return s===hoje();}
-function isAmanha(s){return s===fmtDate(addDays(new Date(),1));}
+function hoje(){return fmtDate(new Date());}
+function parseDate(s){if(!s)return null;const p=s.split('/');if(p.length!==3)return null;return new Date(p[2],p[1]-1,p[0]);}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function toISO(s){if(!s)return'';const p=s.split('/');if(p.length!==3)return'';return`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}
+function fromISO(s){if(!s)return'';const d=new Date(s+'T12:00:00');return isNaN(d)?'':fmtDate(d);}
+function getMonday(d=new Date()){const r=new Date(d);const day=r.getDay();const diff=day===0?-6:1-day;r.setDate(r.getDate()+diff);r.setHours(0,0,0,0);return r;}
 
-// ─── API ───────────────────────────────────────────────────────
-function getConfig(){
-  return {
-    apiUrl: localStorage.getItem('mm_apiUrl')||DEFAULT_API,
-    token:  localStorage.getItem('mm_token')||'',
-    wa:     localStorage.getItem('mm_wa')||'',
-  };
-}
-function saveConfig(c){
-  localStorage.setItem('mm_apiUrl',c.apiUrl||DEFAULT_API);
-  localStorage.setItem('mm_token',c.token||'');
-  localStorage.setItem('mm_wa',c.wa||'');
-}
+// ─── API ──────────────────────────────────────────────────────
+function getConfig(){return{apiUrl:localStorage.getItem('mm_apiUrl')||DEFAULT_API,token:localStorage.getItem('mm_token')||'',wa:localStorage.getItem('mm_wa')||''};}
+function saveConfig(c){localStorage.setItem('mm_apiUrl',c.apiUrl||DEFAULT_API);localStorage.setItem('mm_token',c.token||'');localStorage.setItem('mm_wa',c.wa||'');}
 
-async function apiFetch(params={}){
+function apiFetch(params={}){
   const {apiUrl,token}=getConfig();
-  const p=new URLSearchParams({token,...params});
-  const url=`${apiUrl}?${p}`;
-  // Usa XMLHttpRequest diretamente — mais confiável com o redirect do Apps Script
-  // e não é interceptado pelo Service Worker para URLs cross-origin
+  const url=`${apiUrl}?${new URLSearchParams({token,...params})}`;
   return new Promise((resolve,reject)=>{
     const xhr=new XMLHttpRequest();
     xhr.open('GET',url,true);
     xhr.onload=()=>{
-      try{
-        if(xhr.status===0&&xhr.responseText===''){
-          reject(new Error('Sem resposta do servidor. Verifique se o deploy está publicado como "Qualquer pessoa".'));
-          return;
-        }
-        const json=JSON.parse(xhr.responseText);
-        if(!json.ok) reject(new Error(json.erro||'Erro desconhecido'));
-        else resolve(json);
-      }catch(e){
-        reject(new Error('Resposta inesperada: '+xhr.responseText.substring(0,80)));
-      }
+      try{const j=JSON.parse(xhr.responseText);j.ok?resolve(j):reject(new Error(j.erro||'Erro'));}
+      catch(e){reject(new Error('Resposta inválida'));}
     };
     xhr.onerror=()=>reject(new Error('Sem acesso ao servidor. Verifique a URL nas Configurações.'));
-    xhr.ontimeout=()=>reject(new Error('Timeout (30s) — servidor demorou demais.'));
+    xhr.ontimeout=()=>reject(new Error('Timeout (30s)'));
     xhr.timeout=30000;
     xhr.send();
   });
 }
+const apiGet   =()=>apiFetch({acao:'get'});
+const apiAdd   =(aba,d)=>apiFetch({acao:'add',aba,dados:encodeURIComponent(JSON.stringify(d))});
+const apiUpdate=(aba,id,d)=>apiFetch({acao:'update',aba,id,dados:encodeURIComponent(JSON.stringify(d))});
+const apiDelete=(aba,id)=>apiFetch({acao:'delete',aba,id});
 
-async function apiAdd(aba,dados){
-  return apiFetch({acao:'add',aba,dados:encodeURIComponent(JSON.stringify(dados))});
-}
-async function apiUpdate(aba,id,dados){
-  return apiFetch({acao:'update',aba,id,dados:encodeURIComponent(JSON.stringify(dados))});
-}
-async function apiDelete(aba,id){
-  return apiFetch({acao:'delete',aba,id});
-}
-async function apiGet(){
-  return apiFetch({acao:'get'});
+// ─── HOOKS ────────────────────────────────────────────────────
+const useSwUpdate=()=>{
+  const [ready,setReady]=useState(window.__swUpdateReady||false);
+  useEffect(()=>{const h=()=>setReady(true);document.addEventListener('swUpdateReady',h);return()=>document.removeEventListener('swUpdateReady',h);},[]);
+  const apply=()=>navigator.serviceWorker?.getRegistration().then(r=>{r?.waiting?.postMessage({type:'SKIP_WAITING'})||window.location.reload();});
+  return{ready,apply};
+};
+
+// Long press: 500ms hold = preview; quick tap = open
+function useLongPress(onTap,onLong,delay=500){
+  const timer=useRef(null);
+  const fired=useRef(false);
+  return{
+    onTouchStart:()=>{fired.current=false;timer.current=setTimeout(()=>{fired.current=true;onLong();},delay);},
+    onTouchEnd:()=>{clearTimeout(timer.current);if(!fired.current)onTap();},
+    onTouchMove:()=>clearTimeout(timer.current),
+    onContextMenu:(e)=>e.preventDefault(),
+  };
 }
 
-// ─── COMPONENTES BÁSICOS ───────────────────────────────────────
-const Spinner=()=>(
-  <div style={{display:'flex',alignItems:'center',justifyContent:'center',flex:1}}>
-    <div style={{width:36,height:36,border:'3px solid #e5e7eb',borderTop:`3px solid ${ACCENT}`,borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
-  </div>
-);
+// ─── BASIC COMPONENTS ─────────────────────────────────────────
+const Spinner=()=><div style={{display:'flex',alignItems:'center',justifyContent:'center',flex:1}}><div style={{width:36,height:36,border:'3px solid #e5e7eb',borderTop:`3px solid ${ACCENT}`,borderRadius:'50%',animation:'spin .8s linear infinite'}}/></div>;
 
 const Avatar=({owner,size=28})=>{
-  const isIza=owner==='iza';
-  const isBoth=owner==='ambos'||(!isIza&&owner!=='israel');
-  if(isBoth)return(
-    <div style={{display:'flex',gap:-6}}>
-      <div style={{width:size,height:size,borderRadius:'50%',background:IZA_C,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:size*.38,fontWeight:700,border:'2px solid #fff',zIndex:1}}>I</div>
-      <div style={{width:size,height:size,borderRadius:'50%',background:ISRAEL_C,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:size*.3,fontWeight:700,border:'2px solid #fff',marginLeft:-8}}>Is</div>
-    </div>
-  );
-  return(
-    <div style={{width:size,height:size,borderRadius:'50%',background:isIza?IZA_C:ISRAEL_C,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:size*(isIza?.42:.3),fontWeight:700,flexShrink:0}}>
-      {isIza?'I':'Is'}
-    </div>
-  );
+  const isIza=owner==='iza',isBoth=owner==='ambos'||(!isIza&&owner!=='israel');
+  if(isBoth)return(<div style={{display:'flex'}}><div style={{width:size,height:size,borderRadius:'50%',background:IZA_C,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:size*.38,fontWeight:700,border:'2px solid #fff',zIndex:1}}>I</div><div style={{width:size,height:size,borderRadius:'50%',background:ISRAEL_C,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:size*.3,fontWeight:700,border:'2px solid #fff',marginLeft:-8}}>Is</div></div>);
+  return<div style={{width:size,height:size,borderRadius:'50%',background:isIza?IZA_C:ISRAEL_C,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:size*(isIza?.42:.3),fontWeight:700,flexShrink:0}}>{isIza?'I':'Is'}</div>;
 };
 
-const SubChip=({materia,small})=>{
-  const s=getSub(materia);
-  return(
-    <span style={{background:s.bg,color:s.color,fontSize:small?9:11,fontWeight:700,padding:small?'2px 6px':'3px 9px',borderRadius:20,whiteSpace:'nowrap'}}>
-      {s.label}
-    </span>
-  );
-};
+const SubChip=({materia,small})=>{const s=getSub(materia);return<span style={{background:s.bg,color:s.color,fontSize:small?9:11,fontWeight:700,padding:small?'2px 6px':'3px 9px',borderRadius:20,whiteSpace:'nowrap'}}>{s.label}</span>;};
 
-const TipoChip=({tipo})=>{
-  const MAP={'Escola':{c:'#3B82F6',bg:'#EFF6FF',e:'🏫'},'Professor(a)':{c:'#16A34A',bg:'#F0FDF4',e:'👩‍🏫'},'Evento':{c:'#D97706',bg:'#FFFBEB',e:'📅'},'Financeiro':{c:'#DC2626',bg:'#FEF2F2',e:'💰'},'Saúde':{c:'#0891B2',bg:'#ECFEFF',e:'🩺'},'Saude':{c:'#0891B2',bg:'#ECFEFF',e:'🩺'}};
-  const t=MAP[tipo]||{c:'#888',bg:'#f5f5f7',e:'📌'};
-  return <span style={{background:t.bg,color:t.c,fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20}}>{t.e} {tipo}</span>;
-};
+const EtiqChip=({etiqueta})=>{const t=getEtiq(etiqueta);return<span style={{background:t.bg,color:t.c,fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,display:'inline-flex',alignItems:'center',gap:3}}>{t.e} {t.label}</span>;};
 
-const BackBtn=({onPress,label='Voltar'})=>(
-  <button onClick={onPress} style={{background:'#f0f0f2',border:'none',borderRadius:10,padding:'7px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:4,fontSize:12,fontWeight:600,color:'#555'}}>
-    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M9 11L5 7l4-4" stroke="#555" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
-    {label}
-  </button>
-);
+const BackBtn=({onPress})=><button onClick={onPress} style={{background:'#f0f0f2',border:'none',borderRadius:10,padding:'7px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:4,fontSize:12,fontWeight:600,color:'#555'}}><svg width="14" height="14" viewBox="0 0 14 14"><path d="M9 11L5 7l4-4" stroke="#555" strokeWidth="1.8" strokeLinecap="round" fill="none"/></svg>Voltar</button>;
 
-const EmptyState=({emoji,msg})=>(
-  <div style={{textAlign:'center',padding:'40px 20px',color:'#bbb'}}>
-    <div style={{fontSize:36,marginBottom:8}}>{emoji}</div>
-    <p style={{fontSize:13,fontWeight:500}}>{msg}</p>
-  </div>
-);
+const EmptyState=({emoji,msg})=><div style={{textAlign:'center',padding:'40px 20px',color:'#bbb'}}><div style={{fontSize:36,marginBottom:8}}>{emoji}</div><p style={{fontSize:13,fontWeight:500}}>{msg}</p></div>;
 
-// ─── BOTTOM NAV ────────────────────────────────────────────────
+const SectionTitle=({children,count})=><div style={{display:'flex',alignItems:'center',gap:8,margin:'16px 0 10px'}}><h2 style={{fontSize:15,fontWeight:700,color:'#111'}}>{children}</h2>{count>0&&<span style={{fontSize:10,fontWeight:700,background:'#e5e7eb',color:'#888',borderRadius:99,padding:'1px 7px'}}>{count}</span>}</div>;
+
+// ─── LAYOUT ───────────────────────────────────────────────────
 const NAV=[
-  {id:'home',label:'Início',icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill={a?ACCENT:'none'} stroke={a?ACCENT:'#aaa'} strokeWidth="1.8"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9" fill="none" stroke={a?ACCENT:'#aaa'}/></svg>},
-  {id:'tasks',label:'Tarefas',icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?ACCENT:'#aaa'} strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 12l3 3 7-7" strokeLinecap="round" strokeLinejoin="round"/></svg>},
-  {id:'calendar',label:'Calendário',icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?ACCENT:'#aaa'} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round"/></svg>},
+  {id:'home',label:'Início',icon:a=><svg width="22" height="22" viewBox="0 0 24 24" fill={a?ACCENT:'none'} stroke={a?ACCENT:'#aaa'} strokeWidth="1.8"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9" fill="none" stroke={a?ACCENT:'#aaa'}/></svg>},
+  {id:'tasks',label:'Tarefas',icon:a=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?ACCENT:'#aaa'} strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 12l3 3 7-7" strokeLinecap="round" strokeLinejoin="round"/></svg>},
+  {id:'calendar',label:'Calendário',icon:a=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?ACCENT:'#aaa'} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round"/></svg>},
   {id:'avisos',label:'Avisos',icon:(a,u)=><div style={{position:'relative'}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?ACCENT:'#aaa'} strokeWidth="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>{u>0&&<div style={{position:'absolute',top:-4,right:-5,width:15,height:15,borderRadius:8,background:'#EF4444',color:'#fff',fontSize:8,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{u}</div>}</div>},
-  {id:'mais',label:'Mais',icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill={a?ACCENT:'#aaa'}/><circle cx="12" cy="12" r="1.5" fill={a?ACCENT:'#aaa'}/><circle cx="19" cy="12" r="1.5" fill={a?ACCENT:'#aaa'}/></svg>},
+  {id:'mais',label:'Mais',icon:a=><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill={a?ACCENT:'#aaa'}/><circle cx="12" cy="12" r="1.5" fill={a?ACCENT:'#aaa'}/><circle cx="19" cy="12" r="1.5" fill={a?ACCENT:'#aaa'}/></svg>},
 ];
 
 const BottomNav=({screen,setScreen,unread})=>{
-  const isMore=screen==='horario'||screen==='boletim'||screen==='configs';
-  return(
-    <div style={{flexShrink:0,background:'#fff',borderTop:'1px solid #ebebeb',display:'flex',paddingTop:8,paddingBottom:`calc(8px + env(safe-area-inset-bottom,0px))`,boxShadow:'0 -4px 20px rgba(0,0,0,.06)'}}>
-      {NAV.map(item=>{
-        const active=screen===item.id||(item.id==='mais'&&isMore);
-        return(
-          <button key={item.id} onClick={()=>setScreen(item.id)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
-            {active&&<div style={{position:'absolute',top:-2,width:36,height:36,background:ACCENT+'18',borderRadius:12}}/>}
-            <div style={{position:'relative',zIndex:1}}>{item.icon(active,item.id==='avisos'?unread:0)}</div>
-            <span style={{fontSize:10,fontWeight:active?700:500,color:active?ACCENT:'#aaa',position:'relative',zIndex:1}}>{item.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
+  const isMore=['horario','boletim','configs','provas'].includes(screen);
+  return<div style={{flexShrink:0,background:'#fff',borderTop:'1px solid #ebebeb',display:'flex',paddingTop:8,paddingBottom:'calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 20px rgba(0,0,0,.06)'}}>
+    {NAV.map(item=>{
+      const active=screen===item.id||(item.id==='mais'&&isMore);
+      return<button key={item.id} onClick={()=>setScreen(item.id)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
+        {active&&<div style={{position:'absolute',top:-2,width:36,height:36,background:ACCENT+'18',borderRadius:12}}/>}
+        <div style={{position:'relative',zIndex:1}}>{item.icon(active,item.id==='avisos'?unread:0)}</div>
+        <span style={{fontSize:10,fontWeight:active?700:500,color:active?ACCENT:'#aaa',position:'relative',zIndex:1}}>{item.label}</span>
+      </button>;
+    })}
+  </div>;
 };
 
-const FAB=({onPress})=>(
-  <button onClick={onPress} style={{position:'fixed',right:20,bottom:`calc(90px + env(safe-area-inset-bottom,0px))`,width:52,height:52,borderRadius:26,background:ACCENT,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 4px 16px ${ACCENT}66`,zIndex:10}}>
-    <svg width="22" height="22" viewBox="0 0 22 22"><path d="M11 4v14M4 11h14" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/></svg>
-  </button>
-);
+const FAB=({onPress})=><button onClick={onPress} style={{position:'fixed',right:20,bottom:'calc(90px + env(safe-area-inset-bottom,0px))',width:52,height:52,borderRadius:26,background:ACCENT,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 4px 16px ${ACCENT}66`,zIndex:10}}>
+  <svg width="22" height="22" viewBox="0 0 22 22"><path d="M11 4v14M4 11h14" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/></svg>
+</button>;
 
-// ─── MAIS MENU OVERLAY ─────────────────────────────────────────
-const MaisMenu=({setScreen,onClose})=>(
-  <div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:50,display:'flex',flexDirection:'column',justifyContent:'flex-end',paddingBottom:`calc(80px + env(safe-area-inset-bottom,0px))`}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-    <div className="slideUp" style={{background:'#fff',margin:'0 16px',borderRadius:20,overflow:'hidden',boxShadow:'0 8px 40px rgba(0,0,0,.2)'}}>
-      {[{id:'horario',label:'Horário de Aulas',e:'🗓'},{id:'boletim',label:'Boletim Escolar',e:'📊'},{id:'configs',label:'Configurações',e:'⚙️'}].map((item,i,arr)=>(
-        <button key={item.id} onClick={()=>setScreen(item.id)} style={{width:'100%',padding:'15px 20px',background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:12,borderBottom:i<arr.length-1?'1px solid #f0f0f0':'none'}}>
-          <span style={{fontSize:20}}>{item.e}</span>
-          <span style={{fontSize:15,fontWeight:600,color:'#111'}}>{item.label}</span>
-          <svg style={{marginLeft:'auto'}} width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#bbb" strokeWidth="1.8" strokeLinecap="round"/></svg>
-        </button>
-      ))}
-    </div>
-    <div style={{height:8}}/>
-    <button onClick={onClose} style={{background:'#fff',margin:'0 16px',borderRadius:16,padding:'15px 0',border:'none',cursor:'pointer',fontSize:15,fontWeight:700,color:'#EF4444'}}>Fechar</button>
+const MaisMenu=({setScreen,onClose})=><div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:50,display:'flex',flexDirection:'column',justifyContent:'flex-end',paddingBottom:'calc(80px + env(safe-area-inset-bottom,0px))'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+  <div className="slideUp" style={{background:'#fff',margin:'0 16px',borderRadius:20,overflow:'hidden',boxShadow:'0 8px 40px rgba(0,0,0,.2)'}}>
+    {[{id:'provas',label:'Provas',e:'📝'},{id:'horario',label:'Horário',e:'🗓'},{id:'boletim',label:'Boletim',e:'📊'},{id:'configs',label:'Configurações',e:'⚙️'}].map((item,i,arr)=><button key={item.id} onClick={()=>setScreen(item.id)} style={{width:'100%',padding:'15px 20px',background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:12,borderBottom:i<arr.length-1?'1px solid #f0f0f0':'none'}}>
+      <span style={{fontSize:20}}>{item.e}</span>
+      <span style={{fontSize:15,fontWeight:600,color:'#111'}}>{item.label}</span>
+      <svg style={{marginLeft:'auto'}} width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#bbb" strokeWidth="1.8" strokeLinecap="round"/></svg>
+    </button>)}
   </div>
-);
+  <div style={{height:8}}/>
+  <button onClick={onClose} style={{background:'#fff',margin:'0 16px',borderRadius:16,padding:'15px 0',border:'none',cursor:'pointer',fontSize:15,fontWeight:700,color:'#EF4444'}}>Fechar</button>
+</div>;
 
-// ─── MODAL ADD ITEM ────────────────────────────────────────────
-const MATERIAS_IZA    =['Matemática','Português','Ciências','História','Geografia','Inglês','Arte','Ed. Física','Filosofia','Prod. de Texto','Soc. Emocional','Religião'];
-const MATERIAS_ISRAEL =['Matemática','Português','Ciências','História','Geografia','Arte','Ed. Física','Inglês','Soc. Emocional','Religião','Prod. de Texto'];
-const MATERIAS_ALL    =[...new Set([...MATERIAS_IZA,...MATERIAS_ISRAEL])].sort();
+const UpdateBanner=({apply})=><div className="slideUp" style={{position:'fixed',top:0,left:0,right:0,zIndex:500,background:'#1E3A5F',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 2px 12px rgba(0,0,0,.3)'}}>
+  <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:16}}>🆕</span><span style={{fontSize:13,fontWeight:600,color:'#fff'}}>Nova versão disponível</span></div>
+  <button onClick={apply} style={{background:ACCENT,color:'#fff',border:'none',borderRadius:20,padding:'6px 14px',fontSize:12,fontWeight:700,cursor:'pointer'}}>Atualizar</button>
+</div>;
 
-const AddModal=({onClose,onSave,loading})=>{
-  const [tab,setTab]=useState('item');
-  const [form,setForm]=useState({titulo:'',filho:'iza',tipo:'tarefa',materia:'',bimestre:'1',descricao:'',dataVenc:''});
-  const [comForm,setComForm]=useState({titulo:'',filho:'iza',etiqueta:'Escola',remetente:'',conteudo:'',data:''});
+// ─── LONG PRESS OVERLAY ───────────────────────────────────────
+const LongPressOverlay=({item,onClose})=>{
+  const s=getSub(item.materia);
+  return<div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:200,display:'flex',alignItems:'flex-end',padding:'0 16px 20px'}} onClick={onClose}>
+    <div className="slideUp" style={{background:'#fff',borderRadius:20,padding:20,width:'100%',maxHeight:'60vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12}}>
+        <SubChip materia={item.materia}/>
+        {item.etapa&&<span style={{fontSize:11,fontWeight:600,color:'#aaa'}}>{item.etapa}ª Etapa</span>}
+        <Avatar owner={item.filho} size={22}/>
+      </div>
+      <h3 style={{fontSize:16,fontWeight:800,color:'#111',marginBottom:8}}>{item.titulo}</h3>
+      {item.descricao
+        ?<p style={{fontSize:13,color:'#444',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{item.descricao}</p>
+        :<p style={{fontSize:13,color:'#bbb'}}>Sem descrição.</p>}
+      {item.dataVenc&&<p style={{fontSize:12,color:ACCENT,fontWeight:700,marginTop:10}}>📅 {item.dataVenc}</p>}
+      <button onClick={onClose} style={{width:'100%',marginTop:14,padding:'10px 0',background:'#f0f0f2',border:'none',borderRadius:12,fontSize:13,fontWeight:700,cursor:'pointer',color:'#555'}}>Fechar</button>
+    </div>
+  </div>;
+};
+
+// ─── CONFIRM MODAL ────────────────────────────────────────────
+const ConfirmModal=({msg,onConfirm,onCancel,confirmLabel='Confirmar',danger=true})=><div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+  <div className="slideUp" style={{background:'#fff',borderRadius:20,padding:24,width:'100%',maxWidth:320}}>
+    <p style={{fontSize:15,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.5,marginBottom:20}}>{msg}</p>
+    <div style={{display:'flex',gap:10}}>
+      <button onClick={onCancel} style={{flex:1,padding:'12px 0',background:'#f0f0f2',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',color:'#555'}}>Cancelar</button>
+      <button onClick={onConfirm} style={{flex:1,padding:'12px 0',background:danger?'#EF4444':ACCENT,border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',color:'#fff'}}>{confirmLabel}</button>
+    </div>
+  </div>
+</div>;
+
+// ─── ADD/EDIT MODAL ───────────────────────────────────────────
+const AddEditModal=({item,onClose,onSave,loading})=>{
+  const editing=!!item?.id;
+  const [tab,setTab]=useState(item?.etiqueta?'comunicado':'item');
+  const [form,setForm]=useState({titulo:item?.titulo||'',filho:item?.filho||'iza',tipo:item?.tipo||'tarefa',materia:item?.materia||'',etapa:item?.etapa||'1',descricao:item?.descricao||'',dataVenc:item?.dataVenc||''});
+  const [comForm,setComForm]=useState({titulo:item?.titulo||'',filho:item?.filho||'iza',etiqueta:item?.etiqueta||'escola',remetente:item?.remetente||'',conteudo:item?.conteudo||'',data:item?.data||''});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const setCom=(k,v)=>setComForm(f=>({...f,[k]:v}));
+  const inp={width:'100%',padding:'10px 12px',border:'1.5px solid #e5e7eb',borderRadius:10,fontSize:14,background:'#fafafa',outline:'none',fontFamily:'inherit'};
+  const lbl={fontSize:12,fontWeight:700,color:'#555',marginBottom:4,display:'block'};
 
   const handleSave=()=>{
     if(tab==='item'){
       if(!form.titulo.trim())return;
-      onSave('item',{...form,status:'pendente',origem:'app'});
+      onSave('item',{...form,status:item?.status||'pendente',origem:item?.origem||'app'});
     } else {
       if(!comForm.titulo.trim())return;
-      onSave('comunicado',{...comForm,fixado:'não',origem:'app'});
+      onSave('comunicado',{...comForm,arquivado:item?.arquivado||'',origem:item?.origem||'app'});
     }
   };
 
-  const inp={width:'100%',padding:'10px 12px',border:'1.5px solid #e5e7eb',borderRadius:10,fontSize:14,background:'#fafafa',outline:'none',fontFamily:'inherit'};
-  const lbl={fontSize:12,fontWeight:700,color:'#555',marginBottom:4,display:'block'};
-
-  return(
-    <div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:100,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-      <div className="slideUp" style={{background:'#fff',borderRadius:'24px 24px 0 0',maxHeight:'90vh',display:'flex',flexDirection:'column',paddingBottom:`calc(16px + env(safe-area-inset-bottom,0px))`}}>
-        <div style={{padding:'16px 20px 8px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <h2 style={{fontSize:18,fontWeight:800,color:'#111'}}>Adicionar</h2>
-          <button onClick={onClose} style={{background:'#f0f0f2',border:'none',borderRadius:8,width:30,height:30,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>×</button>
-        </div>
-        <div style={{display:'flex',margin:'0 20px 12px',background:'#f0f0f2',borderRadius:12,padding:3}}>
-          {[['item','📋 Tarefa'],['comunicado','📢 Comunicado']].map(([v,l])=>(
-            <button key={v} onClick={()=>setTab(v)} style={{flex:1,padding:'7px 0',borderRadius:9,background:tab===v?'#fff':'transparent',border:'none',cursor:'pointer',fontSize:12,fontWeight:700,color:tab===v?'#111':'#888',boxShadow:tab===v?'0 1px 4px rgba(0,0,0,.1)':'none',transition:'all .2s'}}>{l}</button>
-          ))}
-        </div>
-        <div style={{overflowY:'auto',padding:'0 20px',flex:1,display:'flex',flexDirection:'column',gap:12}}>
-          {tab==='item'?(
-            <>
-              <div><label style={lbl}>Título *</label><input style={inp} value={form.titulo} onChange={e=>set('titulo',e.target.value)} placeholder="Ex: Prova de Matemática cap. 5"/></div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div><label style={lbl}>Filho</label>
-                  <select style={inp} value={form.filho} onChange={e=>set('filho',e.target.value)}>
-                    <option value="iza">Iza</option><option value="israel">Israel</option><option value="ambos">Ambos</option>
-                  </select>
-                </div>
-                <div><label style={lbl}>Tipo</label>
-                  <select style={inp} value={form.tipo} onChange={e=>set('tipo',e.target.value)}>
-                    <option value="tarefa">Tarefa</option><option value="prova">Prova</option><option value="trabalho">Trabalho</option><option value="atividade">Atividade</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div><label style={lbl}>Matéria</label>
-                  <select style={inp} value={form.materia} onChange={e=>set('materia',e.target.value)}>
-                    <option value="">— Selecione —</option>
-                    {MATERIAS_ALL.map(m=><option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div><label style={lbl}>Bimestre</label>
-                  <select style={inp} value={form.bimestre} onChange={e=>set('bimestre',e.target.value)}>
-                    <option value="1">1°</option><option value="2">2°</option><option value="3">3°</option><option value="4">4°</option>
-                  </select>
-                </div>
-              </div>
-              <div><label style={lbl}>Data de entrega</label><input style={inp} type="date" value={form._dateISO||''} onChange={e=>{const d=new Date(e.target.value+'T12:00:00');set('dataVenc',fmtDate(d));set('_dateISO',e.target.value);}}/></div>
-              <div><label style={lbl}>Descrição</label><textarea style={{...inp,resize:'none',minHeight:60}} value={form.descricao} onChange={e=>set('descricao',e.target.value)} placeholder="Detalhes opcionais..."/></div>
-            </>
-          ):(
-            <>
-              <div><label style={lbl}>Título *</label><input style={inp} value={comForm.titulo} onChange={e=>setCom('titulo',e.target.value)} placeholder="Ex: Reunião de Pais — 10/05"/></div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div><label style={lbl}>Para</label>
-                  <select style={inp} value={comForm.filho} onChange={e=>setCom('filho',e.target.value)}>
-                    <option value="iza">Iza</option><option value="israel">Israel</option><option value="ambos">Ambos</option>
-                  </select>
-                </div>
-                <div><label style={lbl}>Etiqueta</label>
-                  <select style={inp} value={comForm.etiqueta} onChange={e=>setCom('etiqueta',e.target.value)}>
-                    {['Escola','Professor(a)','Evento','Financeiro','Saúde'].map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div><label style={lbl}>Remetente</label><input style={inp} value={comForm.remetente} onChange={e=>setCom('remetente',e.target.value)} placeholder="Ex: Profª Bruna"/></div>
-              <div><label style={lbl}>Data</label><input style={inp} type="date" value={comForm._dateISO||''} onChange={e=>{const d=new Date(e.target.value+'T12:00:00');setCom('data',fmtDate(d));setCom('_dateISO',e.target.value);}}/></div>
-              <div><label style={lbl}>Conteúdo *</label><textarea style={{...inp,resize:'none',minHeight:80}} value={comForm.conteudo} onChange={e=>setCom('conteudo',e.target.value)} placeholder="Mensagem do comunicado..."/></div>
-            </>
-          )}
-        </div>
-        <div style={{padding:'16px 20px 0'}}>
-          <button onClick={handleSave} disabled={loading} style={{width:'100%',padding:'14px 0',background:ACCENT,color:'#fff',border:'none',borderRadius:14,fontSize:15,fontWeight:800,cursor:'pointer',opacity:loading?.7:1}}>
-            {loading?'Salvando…':'Salvar'}
-          </button>
-        </div>
+  return<div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:100,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="slideUp" style={{background:'#fff',borderRadius:'24px 24px 0 0',maxHeight:'90vh',display:'flex',flexDirection:'column',paddingBottom:'calc(16px + env(safe-area-inset-bottom,0px))'}}>
+      <div style={{padding:'16px 20px 8px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <h2 style={{fontSize:18,fontWeight:800,color:'#111'}}>{editing?'Editar':'Adicionar'}</h2>
+        <button onClick={onClose} style={{background:'#f0f0f2',border:'none',borderRadius:8,width:30,height:30,cursor:'pointer',fontSize:16}}>×</button>
+      </div>
+      {!editing&&<div style={{display:'flex',margin:'0 20px 12px',background:'#f0f0f2',borderRadius:12,padding:3}}>
+        {[['item','📋 Tarefa'],['comunicado','📢 Comunicado']].map(([v,l])=><button key={v} onClick={()=>setTab(v)} style={{flex:1,padding:'7px 0',borderRadius:9,background:tab===v?'#fff':'transparent',border:'none',cursor:'pointer',fontSize:12,fontWeight:700,color:tab===v?'#111':'#888',boxShadow:tab===v?'0 1px 4px rgba(0,0,0,.1)':'none',transition:'all .2s'}}>{l}</button>)}
+      </div>}
+      <div style={{overflowY:'auto',padding:'0 20px',flex:1,display:'flex',flexDirection:'column',gap:12}}>
+        {tab==='item'?(<>
+          <div><label style={lbl}>Título *</label><input style={inp} value={form.titulo} onChange={e=>set('titulo',e.target.value)} placeholder="Ex: Prova de Matemática"/></div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            <div><label style={lbl}>Filho</label><select style={inp} value={form.filho} onChange={e=>set('filho',e.target.value)}><option value="iza">Iza</option><option value="israel">Israel</option><option value="ambos">Ambos</option></select></div>
+            <div><label style={lbl}>Tipo</label><select style={inp} value={form.tipo} onChange={e=>set('tipo',e.target.value)}>{TIPOS_ITEM.map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select></div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            <div><label style={lbl}>Matéria</label><select style={inp} value={form.materia} onChange={e=>set('materia',e.target.value)}><option value="">— Selecione —</option>{MATERIAS_ALL.map(m=><option key={m} value={m}>{getSub(m).label}</option>)}</select></div>
+            <div><label style={lbl}>Etapa</label><select style={inp} value={form.etapa} onChange={e=>set('etapa',e.target.value)}>{ETAPAS.map(e=><option key={e} value={e}>{e}ª</option>)}</select></div>
+          </div>
+          <div><label style={lbl}>Data</label><input style={inp} type="date" value={toISO(form.dataVenc)} onChange={e=>set('dataVenc',fromISO(e.target.value))}/></div>
+          <div><label style={lbl}>Descrição</label><textarea style={{...inp,resize:'none',minHeight:70}} value={form.descricao} onChange={e=>set('descricao',e.target.value)} placeholder="Detalhes, capítulo, etc."/></div>
+        </>):(<>
+          <div><label style={lbl}>Título *</label><input style={inp} value={comForm.titulo} onChange={e=>setCom('titulo',e.target.value)} placeholder="Ex: Reunião de pais — 15/06"/></div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            <div><label style={lbl}>Para</label><select style={inp} value={comForm.filho} onChange={e=>setCom('filho',e.target.value)}><option value="iza">Iza</option><option value="israel">Israel</option><option value="ambos">Ambos</option></select></div>
+            <div><label style={lbl}>Etiqueta</label><select style={inp} value={comForm.etiqueta} onChange={e=>setCom('etiqueta',e.target.value)}>{ETIQUETAS_COM.map(et=><option key={et} value={et}>{getEtiq(et).label}</option>)}</select></div>
+          </div>
+          <div><label style={lbl}>Remetente</label><input style={inp} value={comForm.remetente} onChange={e=>setCom('remetente',e.target.value)} placeholder="Ex: Profª Bruna"/></div>
+          <div><label style={lbl}>Data</label><input style={inp} type="date" value={toISO(comForm.data)} onChange={e=>setCom('data',fromISO(e.target.value))}/></div>
+          <div><label style={lbl}>Conteúdo</label><textarea style={{...inp,resize:'none',minHeight:80}} value={comForm.conteudo} onChange={e=>setCom('conteudo',e.target.value)} placeholder="Mensagem..."/></div>
+        </>)}
+      </div>
+      <div style={{padding:'16px 20px 0'}}>
+        <button onClick={handleSave} disabled={loading} style={{width:'100%',padding:'14px 0',background:ACCENT,color:'#fff',border:'none',borderRadius:14,fontSize:15,fontWeight:800,cursor:'pointer',opacity:loading?.7:1}}>
+          {loading?'Salvando…':editing?'Salvar alterações':'Salvar'}
+        </button>
       </div>
     </div>
-  );
+  </div>;
+};
+
+// ─── ITEM CARD (com long press) ───────────────────────────────
+const ItemCard=({item,onPress,onLongPress,onToggle,onEdit,onDelete,showDelete=true})=>{
+  const lp=useLongPress(()=>onPress&&onPress(item),()=>onLongPress&&onLongPress(item));
+  const s=getSub(item.materia);
+  const done=item.status==='concluido';
+  const now=new Date(); now.setHours(0,0,0,0);
+  const dt=parseDate(item.dataVenc);
+  const diff=dt?Math.round((dt-now)/(1000*60*60*24)):null;
+  const urg=diff===null?'normal':diff<0?'vencido':diff===0?'hoje':diff<=2?'urgente':'normal';
+  const urgColor={vencido:'#DC2626',hoje:'#DC2626',urgente:'#D97706',normal:s.color}[urg];
+  return<div {...lp} style={{background:'#fff',borderRadius:14,padding:'11px 13px',marginBottom:8,display:'flex',alignItems:'center',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',opacity:done?.55:1,borderLeft:`3px solid ${urgColor}`,cursor:'pointer',userSelect:'none'}}>
+    {onToggle&&<button onClick={e=>{e.stopPropagation();onToggle(item);}} style={{width:22,height:22,borderRadius:11,flexShrink:0,background:done?ACCENT:'transparent',border:`2px solid ${done?ACCENT:'#ccc'}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+      {done&&<svg width="11" height="11" viewBox="0 0 11 11"><polyline points="2,5.5 4.5,8 9,3" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round"/></svg>}
+    </button>}
+    <div style={{flex:1,minWidth:0}}>
+      <p style={{fontSize:13,fontWeight:600,color:'#111',textDecoration:done?'line-through':'none',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.titulo}</p>
+      <div style={{display:'flex',gap:5,alignItems:'center',flexWrap:'wrap'}}>
+        <SubChip materia={item.materia} small/>
+        {item.etapa&&<span style={{fontSize:9,fontWeight:600,color:'#aaa',background:'#f0f0f2',borderRadius:20,padding:'1px 5px'}}>{item.etapa}ª etapa</span>}
+        {item.dataVenc&&<span style={{fontSize:10,fontWeight:600,color:urg==='normal'?'#aaa':'#DC2626'}}>{item.dataVenc}</span>}
+        <Avatar owner={item.filho} size={16}/>
+      </div>
+    </div>
+    <div style={{display:'flex',gap:4,flexShrink:0}}>
+      {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit(item);}} style={{background:'#f0f0f2',border:'none',borderRadius:8,width:28,height:28,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2.5l2 2L3 11H1V9L7.5 2.5z" stroke="#666" strokeWidth="1.3" strokeLinejoin="round"/></svg>
+      </button>}
+      {showDelete&&onDelete&&<button onClick={e=>{e.stopPropagation();onDelete(item);}} style={{background:'#FEF2F2',border:'none',borderRadius:8,width:28,height:28,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4.5 3V2h3v1M9.5 3l-.6 6.5a.5.5 0 01-.5.5H3.6a.5.5 0 01-.5-.5L2.5 3" stroke="#DC2626" strokeWidth="1.3" strokeLinecap="round"/></svg>
+      </button>}
+    </div>
+  </div>;
+};
+
+// ─── ITEM DETALHE SCREEN ──────────────────────────────────────
+const ItemDetalhe=({item,onClose,onEdit,onDelete})=>{
+  const s=getSub(item.materia);
+  const now=new Date();now.setHours(0,0,0,0);
+  const dt=parseDate(item.dataVenc);
+  const diff=dt?Math.round((dt-now)/(1000*60*60*24)):null;
+  const done=item.status==='concluido';
+  return<div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:'#f5f5f7'}}>
+    <div style={{padding:'16px 20px 10px',display:'flex',gap:10,alignItems:'center',background:'#fff',borderBottom:'1px solid #f0f0f0',flexShrink:0}}>
+      <BackBtn onPress={onClose}/>
+      <div style={{display:'flex',gap:6,marginLeft:'auto'}}>
+        <button onClick={()=>onEdit(item)} style={{background:'#f0f0f2',border:'none',borderRadius:10,padding:'7px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:'#555'}}>✏️ Editar</button>
+        <button onClick={()=>onDelete(item)} style={{background:'#FEF2F2',border:'none',borderRadius:10,padding:'7px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:'#DC2626'}}>🗑 Excluir</button>
+      </div>
+    </div>
+    <div style={{flex:1,overflowY:'auto',padding:20}}>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+        <SubChip materia={item.materia}/>
+        {item.etapa&&<span style={{fontSize:11,fontWeight:600,background:'#e8edf5',color:'#1E3A5F',borderRadius:20,padding:'2px 8px'}}>{item.etapa}ª Etapa</span>}
+        <span style={{fontSize:11,fontWeight:600,background:done?'#D1FAE5':'#FEF3C7',color:done?'#065F46':'#92400E',borderRadius:20,padding:'2px 8px'}}>{done?'✓ Concluído':'Pendente'}</span>
+        <Avatar owner={item.filho} size={22}/>
+      </div>
+      <h1 style={{fontSize:20,fontWeight:800,color:'#111',lineHeight:1.3,marginBottom:12}}>{item.titulo}</h1>
+      {item.dataVenc&&<div style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:10,display:'flex',gap:10,alignItems:'center',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+        <span style={{fontSize:20}}>📅</span>
+        <div>
+          <p style={{fontSize:11,color:'#aaa',fontWeight:500}}>Data de entrega</p>
+          <p style={{fontSize:14,fontWeight:700,color:diff!==null&&diff<0?'#DC2626':diff===0?'#D97706':'#111'}}>{item.dataVenc}{diff!==null&&(diff<0?` • ${Math.abs(diff)} dia(s) atrasado`:diff===0?' • Hoje!':diff<=3?` • Em ${diff} dia(s)`:'')}</p>
+        </div>
+      </div>}
+      {item.tipo&&<div style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+        <p style={{fontSize:11,color:'#aaa',fontWeight:500,marginBottom:2}}>Tipo</p>
+        <p style={{fontSize:13,fontWeight:600,color:'#111',textTransform:'capitalize'}}>{item.tipo}</p>
+      </div>}
+      <div style={{background:'#fff',borderRadius:14,padding:'14px',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+        <p style={{fontSize:11,color:'#aaa',fontWeight:500,marginBottom:6}}>Descrição</p>
+        {item.descricao
+          ?<p style={{fontSize:13,color:'#333',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{item.descricao}</p>
+          :<p style={{fontSize:13,color:'#bbb'}}>Sem descrição cadastrada.</p>}
+      </div>
+      {item.origem&&<p style={{fontSize:10,color:'#ccc',marginTop:12,textAlign:'center'}}>Origem: {item.origem}</p>}
+    </div>
+  </div>;
 };
 
 // ═══════════════════════════════════════════════════════════════
 // HOME SCREEN
 // ═══════════════════════════════════════════════════════════════
-const HomeScreen=({itens,comunicados,setScreen,onWA})=>{
-  const now=new Date();
+const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA})=>{
+  const [filho,setFilho]=useState('all');
+  const now=new Date();now.setHours(0,0,0,0);
   const hojeStr=hoje();
-  const nomesDia=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  const mon=getMonday();
+  const sun=addDays(mon,6);
 
-  const pendentes=itens.filter(i=>i.status!=='concluido'&&i.status!=='concluído');
-  const paraHoje =pendentes.filter(i=>i.dataVenc===hojeStr);
-  const unread   =comunicados.filter(c=>!c._lido).length;
+  const pendentes=itens.filter(i=>i.status!=='concluido'&&i.status!=='cancelado');
+  const filtrados=filho==='all'?pendentes:pendentes.filter(i=>i.filho===filho||i.filho==='ambos');
 
-  const proximos=useMemo(()=>{
-    const limit=fmtDate(addDays(now,7));
-    return pendentes
-      .filter(i=>i.dataVenc&&i.dataVenc>hojeStr&&i.dataVenc<=limit)
-      .sort((a,b)=>(parseDate(a.dataVenc)||0)-(parseDate(b.dataVenc)||0))
-      .slice(0,5);
-  },[itens]);
+  const atrasados=filtrados.filter(i=>{const d=parseDate(i.dataVenc);return d&&d<now;});
+  const paraHoje=filtrados.filter(i=>i.dataVenc===hojeStr);
+  const estaSemanaDatas=[];
+  for(let d=addDays(now,1);d<=sun;d=addDays(d,1))estaSemanaDatas.push(fmtDate(d));
+  const estaSemana=filtrados.filter(i=>estaSemanaDatas.includes(i.dataVenc));
+  const prox7=filtrados.filter(i=>{const d=parseDate(i.dataVenc);return d&&d>sun&&d<=addDays(now,14);}).sort((a,b)=>parseDate(a.dataVenc)-parseDate(b.dataVenc)).slice(0,6);
 
-  const total=pendentes.length;
-  const concluidos=itens.filter(i=>i.status==='concluido'||i.status==='concluído').length;
+  const urgentes=comunicados.filter(c=>c.etiqueta==='urgente'&&c.arquivado!=='sim');
+  const unread=comunicados.filter(c=>!c._lido&&c.arquivado!=='sim').length;
 
-  return(
-    <div className="fade" style={{flex:1,overflowY:'auto'}}>
-      <div style={{padding:'16px 20px 10px'}}>
-        <p style={{fontSize:13,color:'#888',fontWeight:500}}>{nomesDia[now.getDay()]}, {now.getDate()} de {MESES_PT[now.getMonth()]}</p>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4,marginBottom:14}}>
-          <h1 style={{fontSize:24,fontWeight:800,color:'#111',lineHeight:1.2}}>Olá, dupla! 👋</h1>
-          <div style={{display:'flex',gap:3}}>
-            <Avatar owner="iza" size={34}/>
-            <Avatar owner="israel" size={34}/>
-          </div>
-        </div>
-
-        {/* Atalhos */}
-        <div style={{display:'flex',gap:8,marginBottom:14}}>
-          {[{id:'horario',e:'🗓',l:'Horário',c:'#6366F1',bg:'#EEF2FF'},{id:'boletim',e:'📊',l:'Boletim',c:'#0891B2',bg:'#ECFEFF'},{id:'avisos',e:'🔔',l:'Avisos',c:'#D97706',bg:'#FFFBEB',b:unread}].map(item=>(
-            <button key={item.id} onClick={()=>setScreen(item.id)} style={{flex:1,background:item.bg,border:'none',borderRadius:14,padding:'10px 4px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4,position:'relative'}}>
-              {item.b>0&&<div style={{position:'absolute',top:6,right:8,width:14,height:14,borderRadius:7,background:'#EF4444',color:'#fff',fontSize:8,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{item.b}</div>}
-              <span style={{fontSize:20}}>{item.e}</span>
-              <span style={{fontSize:10,fontWeight:700,color:item.c}}>{item.l}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Banner progresso */}
-        <div style={{background:`linear-gradient(135deg,${ACCENT} 0%,#fb923c 100%)`,borderRadius:20,padding:'16px 18px',display:'flex',alignItems:'center',gap:14,boxShadow:`0 6px 20px ${ACCENT}44`,marginBottom:20}}>
-          <div style={{flex:1}}>
-            <p style={{fontSize:12,color:'rgba(255,255,255,.85)',fontWeight:500}}>Tarefas pendentes</p>
-            <p style={{fontSize:22,fontWeight:800,color:'#fff',margin:'2px 0 8px'}}>{total} tarefas</p>
-            <div style={{background:'rgba(255,255,255,.3)',borderRadius:99,height:6,overflow:'hidden'}}>
-              <div style={{width:total>0?`${Math.round(concluidos/(total+concluidos)*100)}%`:'0%',height:'100%',background:'#fff',borderRadius:99,transition:'width .5s'}}/>
-            </div>
-          </div>
-          {/* Botão WhatsApp */}
-          <button onClick={onWA} style={{background:'rgba(255,255,255,.2)',border:'none',borderRadius:16,padding:'10px 12px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-            <span style={{fontSize:22}}>📲</span>
-            <span style={{fontSize:9,fontWeight:700,color:'#fff'}}>WhatsApp</span>
-          </button>
-        </div>
-
-        {/* Para hoje */}
-        <h2 style={{fontSize:16,fontWeight:700,color:'#111',marginBottom:10}}>Para hoje</h2>
-        {paraHoje.length===0
-          ?<div style={{background:'#fff',borderRadius:14,padding:'14px 16px',marginBottom:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}><p style={{color:'#aaa',fontSize:13}}>Nada pendente para hoje 🎉</p></div>
-          :paraHoje.map(item=>(
-            <div key={item.id} style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'center',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',borderLeft:`3px solid ${getSub(item.materia).color}`}}>
-              <div style={{flex:1}}>
-                <p style={{fontSize:13,fontWeight:600,color:'#111',marginBottom:4}}>{item.titulo}</p>
-                <div style={{display:'flex',gap:6,alignItems:'center'}}><SubChip materia={item.materia} small/><Avatar owner={item.filho} size={18}/></div>
-              </div>
-              <div style={{width:20,height:20,borderRadius:10,border:`2px solid ${ACCENT}`,flexShrink:0}}/>
-            </div>
-          ))
-        }
-
-        {/* Próximos */}
-        {proximos.length>0&&(
-          <>
-            <h2 style={{fontSize:16,fontWeight:700,color:'#111',margin:'16px 0 10px'}}>Próximos 7 dias</h2>
-            {proximos.map(item=>{
-              const s=getSub(item.materia);
-              const dParts=item.dataVenc.split('/');
-              return(
-                <div key={item.id} style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'center',gap:12,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
-                  <div style={{width:40,height:40,borderRadius:12,background:s.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <span style={{fontSize:13,fontWeight:800,color:s.color,lineHeight:1}}>{dParts[0]}</span>
-                    <span style={{fontSize:9,color:s.color,fontWeight:600,opacity:.7}}>{MESES_ABR[parseInt(dParts[1])-1]}</span>
-                  </div>
-                  <div style={{flex:1}}>
-                    <p style={{fontSize:13,fontWeight:600,color:'#111'}}>{item.titulo}</p>
-                    <div style={{display:'flex',gap:6,alignItems:'center',marginTop:3}}><SubChip materia={item.materia} small/><Avatar owner={item.filho} size={18}/></div>
-                  </div>
-                </div>
-              );
-            })}
-          </>
-        )}
+  const dateCard=(item)=>{
+    const s=getSub(item.materia);
+    const d=parseDate(item.dataVenc);
+    return<div key={item.id} style={{background:'#fff',borderRadius:14,padding:'11px 13px',marginBottom:7,display:'flex',alignItems:'center',gap:12,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+      <div style={{width:40,height:40,borderRadius:12,background:s.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+        <span style={{fontSize:13,fontWeight:800,color:s.color,lineHeight:1}}>{d.getDate()}</span>
+        <span style={{fontSize:8,color:s.color,opacity:.7,fontWeight:600}}>{MESES_ABR[d.getMonth()]}</span>
       </div>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{fontSize:13,fontWeight:600,color:'#111',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.titulo}</p>
+        <div style={{display:'flex',gap:5,alignItems:'center',marginTop:3}}><SubChip materia={item.materia} small/><span style={{fontSize:9,color:'#bbb'}}>{DIAS[d.getDay()]}</span><Avatar owner={item.filho} size={16}/></div>
+      </div>
+    </div>;
+  };
+
+  return<div className="fade" style={{flex:1,overflowY:'auto'}}>
+    <div style={{padding:'16px 20px 20px'}}>
+      {/* Header */}
+      <p style={{fontSize:12,color:'#888',fontWeight:500}}>{DIAS_LONG[now.getDay()]}, {now.getDate()} de {MESES[now.getMonth()]}</p>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4,marginBottom:14}}>
+        <h1 style={{fontSize:22,fontWeight:800,color:'#111'}}>Olá, dupla! 👋</h1>
+        <div style={{display:'flex',gap:4}}>
+          {[['all','Todos'],['iza','I'],['israel','Is']].map(([v,l])=><button key={v} onClick={()=>setFilho(v)} style={{width:v==='all'?52:34,height:34,borderRadius:v==='all'?12:17,background:filho===v?ACCENT:'#f0f0f2',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all .2s'}}>
+            {v==='all'?<span style={{fontSize:10,fontWeight:700,color:filho==='all'?'#fff':'#888'}}>Todos</span>:<div style={{width:26,height:26,borderRadius:13,background:filho===v?'#fff':(v==='iza'?IZA_C:ISRAEL_C),display:'flex',alignItems:'center',justifyContent:'center',fontSize:v==='iza'?11:9,fontWeight:700,color:filho===v?(v==='iza'?IZA_C:ISRAEL_C):'#fff'}}>{l}</div>}
+          </button>)}
+        </div>
+      </div>
+
+      {/* Banner urgente */}
+      {urgentes.length>0&&<div style={{background:'#FEF2F2',border:'2px solid #DC2626',borderRadius:16,padding:'12px 14px',marginBottom:12,display:'flex',gap:10,alignItems:'center',cursor:'pointer'}} onClick={()=>setScreen('avisos')}>
+        <span className="pulse" style={{fontSize:20}}>🚨</span>
+        <div>
+          <p style={{fontSize:12,fontWeight:800,color:'#DC2626'}}>URGENTE</p>
+          <p style={{fontSize:11,color:'#991B1B'}}>{urgentes[0].titulo}</p>
+        </div>
+      </div>}
+
+      {/* Stats banner */}
+      <div style={{background:`linear-gradient(135deg,${ACCENT},#fb923c)`,borderRadius:20,padding:'16px 18px',display:'flex',alignItems:'center',gap:14,boxShadow:`0 6px 20px ${ACCENT}44`,marginBottom:20,cursor:'pointer'}} onClick={()=>{setTasksFilter({status:'pendente',filho});setScreen('tasks');}}>
+        <div style={{flex:1}}>
+          <p style={{fontSize:12,color:'rgba(255,255,255,.85)',fontWeight:500}}>Tarefas pendentes</p>
+          <p style={{fontSize:24,fontWeight:800,color:'#fff',margin:'2px 0 8px'}}>{filtrados.length} tarefas</p>
+          <div style={{background:'rgba(255,255,255,.3)',borderRadius:99,height:6}}><div style={{width:filtrados.length>0?`${Math.min(100,Math.round(atrasados.length/filtrados.length*100))}%`:'0%',height:'100%',background:'rgba(255,80,80,.8)',borderRadius:99}}/></div>
+        </div>
+        <button onClick={e=>{e.stopPropagation();onWA();}} style={{background:'rgba(255,255,255,.2)',border:'none',borderRadius:16,padding:'10px 12px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+          <span style={{fontSize:22}}>📲</span><span style={{fontSize:9,fontWeight:700,color:'#fff'}}>WhatsApp</span>
+        </button>
+      </div>
+
+      {/* Atalhos */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
+        {[{id:'provas',e:'📝',l:'Provas',c:'#DC2626',bg:'#FEF2F2'},{id:'horario',e:'🗓',l:'Horário',c:'#6366F1',bg:'#EEF2FF'},{id:'boletim',e:'📊',l:'Boletim',c:'#0891B2',bg:'#ECFEFF'},{id:'avisos',e:'🔔',l:'Avisos',c:'#D97706',bg:'#FFFBEB',b:unread}].map(item=><button key={item.id} onClick={()=>setScreen(item.id)} style={{background:item.bg,border:'none',borderRadius:14,padding:'10px 4px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4,position:'relative'}}>
+          {item.b>0&&<div style={{position:'absolute',top:5,right:6,width:14,height:14,borderRadius:7,background:'#EF4444',color:'#fff',fontSize:8,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{item.b}</div>}
+          <span style={{fontSize:18}}>{item.e}</span><span style={{fontSize:10,fontWeight:700,color:item.c}}>{item.l}</span>
+        </button>)}
+      </div>
+
+      {/* Atrasados */}
+      {atrasados.length>0&&<><SectionTitle count={atrasados.length}>🔴 Atrasados</SectionTitle>
+        {atrasados.map(item=>{const s=getSub(item.materia);const d=parseDate(item.dataVenc);const dias=Math.abs(Math.round((d-now)/(1000*60*60*24)));return<div key={item.id} style={{background:'#FEF2F2',borderRadius:14,padding:'11px 13px',marginBottom:7,display:'flex',alignItems:'center',gap:12,borderLeft:'3px solid #DC2626'}}>
+          <div style={{flex:1}}><p style={{fontSize:13,fontWeight:700,color:'#DC2626',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.titulo}</p><div style={{display:'flex',gap:5,alignItems:'center'}}><SubChip materia={item.materia} small/><span style={{fontSize:10,color:'#DC2626',fontWeight:600}}>{dias}d atraso</span><Avatar owner={item.filho} size={16}/></div></div>
+        </div>;})}
+      </>}
+
+      {/* Para hoje */}
+      <SectionTitle count={paraHoje.length}>📌 Para hoje</SectionTitle>
+      {paraHoje.length===0?<div style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}><p style={{color:'#aaa',fontSize:13}}>Nada para hoje 🎉</p></div>:paraHoje.map(item=><div key={item.id} style={{background:'#fff',borderRadius:14,padding:'11px 13px',marginBottom:7,display:'flex',alignItems:'center',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',borderLeft:`3px solid ${getSub(item.materia).color}`}}>
+        <div style={{flex:1,minWidth:0}}><p style={{fontSize:13,fontWeight:600,color:'#111',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.titulo}</p><div style={{display:'flex',gap:5,alignItems:'center'}}><SubChip materia={item.materia} small/><Avatar owner={item.filho} size={16}/></div></div>
+      </div>)}
+
+      {/* Esta semana */}
+      {estaSemana.length>0&&<><SectionTitle count={estaSemana.length}>📅 Esta semana</SectionTitle>{estaSemana.sort((a,b)=>parseDate(a.dataVenc)-parseDate(b.dataVenc)).map(dateCard)}</>}
+
+      {/* Próximos 14 dias */}
+      {prox7.length>0&&<><SectionTitle count={prox7.length}>📆 Próximos dias</SectionTitle>{prox7.map(dateCard)}</>}
     </div>
-  );
+  </div>;
 };
 
 // ═══════════════════════════════════════════════════════════════
 // TASKS SCREEN
 // ═══════════════════════════════════════════════════════════════
-const TasksScreen=({itens,onToggle,onDelete,loading})=>{
+const TasksScreen=({itens,onToggle,onEdit,onDelete,initialFilter={}})=>{
   const [view,setView]=useState('list');
-  const [filho,setFilho]=useState('all');
-  const [statusF,setStatusF]=useState('pendente');
+  const [filho,setFilho]=useState(initialFilter.filho||'all');
+  const [statusF,setStatusF]=useState(initialFilter.status||'pendente');
+  const [materiaF,setMateriaF]=useState('all');
+  const [etapaF,setEtapaF]=useState('all');
+  const [sort,setSort]=useState('data');
+  const [showFilters,setShowFilters]=useState(false);
+  const [detail,setDetail]=useState(null);
+
+  if(detail)return<ItemDetalhe item={detail} onClose={()=>setDetail(null)} onEdit={item=>{setDetail(null);onEdit(item);}} onDelete={item=>{setDetail(null);onDelete(item);}}/>;
 
   const filtered=itens.filter(i=>{
+    const isPend=i.status!=='concluido'&&i.status!=='cancelado';
     const matchF=filho==='all'||i.filho===filho||i.filho==='ambos';
-    const isPend=i.status!=='concluido'&&i.status!=='concluído';
     const matchS=statusF==='pendente'?isPend:!isPend;
-    return matchF&&matchS;
+    const matchM=materiaF==='all'||i.materia===materiaF;
+    const matchE=etapaF==='all'||i.etapa===etapaF;
+    return matchF&&matchS&&matchM&&matchE;
+  }).sort((a,b)=>{
+    if(sort==='data'){const da=parseDate(a.dataVenc)||new Date(9999,0);const db=parseDate(b.dataVenc)||new Date(9999,0);return da-db;}
+    if(sort==='datadesc'){const da=parseDate(a.dataVenc)||new Date(0);const db=parseDate(b.dataVenc)||new Date(0);return db-da;}
+    if(sort==='materia')return(a.materia||'').localeCompare(b.materia||'');
+    if(sort==='filho')return(a.filho||'').localeCompare(b.filho||'');
+    return 0;
   });
 
-  const COLS=[
-    {id:'pendente',label:'A fazer',color:'#94A3B8'},
-    {id:'andamento',label:'Em andamento',color:ACCENT},
-    {id:'concluido',label:'Concluído',color:'#16A34A'},
-  ];
+  const usedMaterias=[...new Set(itens.map(i=>i.materia).filter(Boolean))].sort();
 
-  const hoje2=hoje();
-  const getUrgencia=(item)=>{
-    if(!item.dataVenc)return'normal';
-    const dt=parseDate(item.dataVenc);
-    if(!dt)return'normal';
-    const diff=Math.round((dt-new Date())/(1000*60*60*24));
-    if(diff<0)return'vencido';
-    if(diff===0)return'hoje';
-    if(diff<=2)return'urgente';
-    return'normal';
-  };
-  const urgColors={vencido:'#DC2626',hoje:'#DC2626',urgente:'#D97706',normal:'transparent'};
-
-  return(
-    <div className="fade" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'16px 20px 10px',flexShrink:0}}>
-        <h1 style={{fontSize:22,fontWeight:800,color:'#111',marginBottom:12}}>Tarefas</h1>
-        <div style={{display:'flex',background:'#ebebeb',borderRadius:12,padding:3,marginBottom:10}}>
-          {[['list','≡ Lista'],['kanban','⊞ Kanban']].map(([v,l])=>(
-            <button key={v} onClick={()=>setView(v)} style={{flex:1,padding:'6px 0',borderRadius:9,background:view===v?'#fff':'transparent',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,color:view===v?'#111':'#888',boxShadow:view===v?'0 1px 4px rgba(0,0,0,.1)':'none',transition:'all .2s'}}>{l}</button>
-          ))}
-        </div>
-        <div style={{display:'flex',gap:6,marginBottom:8}}>
-          {[['all','Todos'],['iza','Iza'],['israel','Israel']].map(([v,l])=>(
-            <button key={v} onClick={()=>setFilho(v)} style={{padding:'5px 12px',borderRadius:99,background:filho===v?ACCENT:'#fff',color:filho===v?'#fff':'#666',border:`1.5px solid ${filho===v?ACCENT:'#e0e0e0'}`,fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s'}}>{l}</button>
-          ))}
-          <div style={{marginLeft:'auto',display:'flex',gap:4}}>
-            {[['pendente','Pendentes'],['concluido','Concluídos']].map(([v,l])=>(
-              <button key={v} onClick={()=>setStatusF(v)} style={{padding:'5px 10px',borderRadius:99,background:statusF===v?'#111':'#fff',color:statusF===v?'#fff':'#888',border:'1.5px solid #e0e0e0',fontSize:10,fontWeight:600,cursor:'pointer'}}>{l}</button>
-            ))}
-          </div>
+  return<div className="fade" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{padding:'14px 20px 8px',flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:'#111',flex:1}}>Tarefas</h1>
+        <button onClick={()=>setShowFilters(v=>!v)} style={{background:showFilters?ACCENT:'#f0f0f2',border:'none',borderRadius:10,padding:'6px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:showFilters?'#fff':'#666',display:'flex',alignItems:'center',gap:4}}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M3 6h6M5 9h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>Filtros
+        </button>
+        <div style={{display:'flex',background:'#ebebeb',borderRadius:10,padding:2}}>
+          {[['list','≡'],['kanban','⊞']].map(([v,l])=><button key={v} onClick={()=>setView(v)} style={{width:28,height:24,borderRadius:8,background:view===v?'#fff':'transparent',border:'none',cursor:'pointer',fontSize:13,fontWeight:600,color:view===v?'#111':'#999',boxShadow:view===v?'0 1px 3px rgba(0,0,0,.1)':'none'}}>{l}</button>)}
         </div>
       </div>
 
-      {view==='list'?(
-        <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
-          {filtered.length===0&&<EmptyState emoji="✅" msg="Nenhuma tarefa encontrada"/>}
-          {filtered.sort((a,b)=>{
-            const da=parseDate(a.dataVenc)||new Date(9999,0);
-            const db=parseDate(b.dataVenc)||new Date(9999,0);
-            return da-db;
-          }).map(item=>{
-            const s=getSub(item.materia);
-            const urg=getUrgencia(item);
-            const done=item.status==='concluido'||item.status==='concluído';
-            return(
-              <div key={item.id} style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'center',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',opacity:done?.55:1,borderLeft:`3px solid ${urg==='normal'?s.color:urgColors[urg]}`}}>
-                <button onClick={()=>onToggle(item)} style={{width:22,height:22,borderRadius:11,flexShrink:0,background:done?ACCENT:'transparent',border:`2px solid ${done?ACCENT:'#ccc'}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all .2s',padding:0}}>
-                  {done&&<svg width="11" height="11" viewBox="0 0 11 11"><polyline points="2,5.5 4.5,8 9,3" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                </button>
-                <div style={{flex:1,minWidth:0}}>
-                  <p style={{fontSize:13,fontWeight:600,color:'#111',textDecoration:done?'line-through':'none',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.titulo}</p>
-                  <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                    <SubChip materia={item.materia} small/>
-                    {item.dataVenc&&<span style={{fontSize:10,color:urg==='vencido'||urg==='hoje'?'#DC2626':urg==='urgente'?'#D97706':'#aaa',fontWeight:600}}>{item.dataVenc}</span>}
-                    <Avatar owner={item.filho} size={16}/>
-                  </div>
-                </div>
-                <button onClick={()=>onDelete('Itens',item.id)} style={{background:'none',border:'none',padding:'4px',cursor:'pointer',opacity:.4,flexShrink:0}}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M11 4l-.7 7a1 1 0 01-1 .9H4.7a1 1 0 01-1-.9L3 4" stroke="#888" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                </button>
+      {showFilters&&<div style={{background:'#fff',borderRadius:14,padding:12,marginBottom:8,boxShadow:'0 1px 4px rgba(0,0,0,.06)',display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'flex',gap:6'}}>
+          <div style={{flex:1}}><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>FILHO</p><div style={{display:'flex',gap:4'}}>{[['all','Todos'],['iza','Iza'],['israel','Israel']].map(([v,l])=><button key={v} onClick={()=>setFilho(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:filho===v?ACCENT:'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:filho===v?'#fff':'#888'}}>{l}</button>)}</div></div>
+          <div style={{flex:1}}><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>STATUS</p><div style={{display:'flex',gap:4}}>{[['pendente','Pendente'],['concluido','Concluído']].map(([v,l])=><button key={v} onClick={()=>setStatusF(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:statusF===v?'#111':'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:statusF===v?'#fff':'#888'}}>{l}</button>)}</div></div>
+        </div>
+        <div><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>ETAPA</p><div style={{display:'flex',gap:4}}>{[['all','Todas'],['1','1ª'],['2','2ª'],['3','3ª']].map(([v,l])=><button key={v} onClick={()=>setEtapaF(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:etapaF===v?'#1E3A5F':'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:etapaF===v?'#fff':'#888'}}>{l}</button>)}</div></div>
+        <div><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>MATÉRIA</p>
+          <select value={materiaF} onChange={e=>setMateriaF(e.target.value)} style={{width:'100%',padding:'7px 10px',border:'1.5px solid #e5e7eb',borderRadius:8,fontSize:12,background:'#fafafa',fontFamily:'inherit'}}>
+            <option value="all">Todas as matérias</option>
+            {usedMaterias.map(m=><option key={m} value={m}>{getSub(m).label}</option>)}
+          </select>
+        </div>
+        <div><p style={{fontSize:10,fontWeight:700,color:'#aaa',marginBottom:4}}>ORDENAR</p><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{[['data','Data ↑'],['datadesc','Data ↓'],['materia','Matéria'],['filho','Filho']].map(([v,l])=><button key={v} onClick={()=>setSort(v)} style={{padding:'5px 10px',borderRadius:8,background:sort===v?ACCENT:'#f5f5f7',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:sort===v?'#fff':'#888'}}>{l}</button>)}</div></div>
+      </div>}
+
+      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+        <span style={{fontSize:11,color:'#aaa',fontWeight:500}}>{filtered.length} {filtered.length===1?'item':'itens'}</span>
+      </div>
+    </div>
+
+    {view==='list'?(<div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
+      {filtered.length===0&&<EmptyState emoji="✅" msg="Nenhuma tarefa encontrada"/>}
+      {filtered.map(item=><ItemCard key={item.id} item={item} onPress={()=>setDetail(item)} onLongPress={()=>{}} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete}/>)}
+    </div>):(
+      <div style={{flex:1,overflowX:'auto',overflowY:'hidden'}}>
+        <div style={{display:'flex',gap:10,padding:'0 20px 16px',height:'100%',minWidth:'max-content'}}>
+          {[{id:'pendente',label:'A fazer',c:'#94A3B8'},{id:'prova',label:'Provas',c:'#DC2626'},{id:'concluido',label:'Concluído',c:'#16A34A'}].map(col=>{
+            const colItems=filtered.filter(i=>col.id==='concluido'?(i.status==='concluido'):col.id==='prova'?(i.tipo==='prova'&&i.status!=='concluido'):(i.status!=='concluido'&&i.tipo!=='prova'));
+            return<div key={col.id} style={{width:200,flexShrink:0,display:'flex',flexDirection:'column',background:'#f0f0f2',borderRadius:18,padding:'12px 10px',maxHeight:'100%'}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+                <div style={{width:8,height:8,borderRadius:4,background:col.c}}/>
+                <span style={{fontSize:12,fontWeight:700,color:'#555'}}>{col.label}</span>
+                <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,background:'#e0e0e5',color:'#888',borderRadius:99,padding:'1px 6px'}}>{colItems.length}</span>
               </div>
-            );
+              <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:7}}>
+                {colItems.length===0&&<p style={{textAlign:'center',color:'#ccc',fontSize:12,paddingTop:16}}>Vazio</p>}
+                {colItems.map(item=>{const s=getSub(item.materia);return<div key={item.id} onClick={()=>setDetail(item)} style={{background:'#fff',borderRadius:12,padding:'10px',boxShadow:'0 1px 4px rgba(0,0,0,.07)',borderTop:`3px solid ${s.color}`,cursor:'pointer'}}>
+                  <p style={{fontSize:12,fontWeight:600,color:'#111',marginBottom:5,lineHeight:1.3}}>{item.titulo}</p>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><SubChip materia={item.materia} small/><Avatar owner={item.filho} size={16}/></div>
+                  {item.dataVenc&&<p style={{fontSize:9,color:'#bbb',marginTop:4}}>{item.dataVenc}</p>}
+                </div>;})}
+              </div>
+            </div>;
           })}
         </div>
-      ):(
-        <div style={{flex:1,overflowX:'auto',overflowY:'hidden'}}>
-          <div style={{display:'flex',gap:10,padding:'0 20px 16px',height:'100%',minWidth:'max-content'}}>
-            {COLS.map(col=>{
-              const colItems=itens.filter(i=>{
-                const isPend=i.status!=='concluido'&&i.status!=='concluído';
-                const inCol=col.id==='concluido'?!isPend:(col.id==='andamento'?(i.tipo==='prova'&&isPend):isPend&&i.tipo!=='prova');
-                const matchF=filho==='all'||i.filho===filho||i.filho==='ambos';
-                return inCol&&matchF;
-              });
-              return(
-                <div key={col.id} style={{width:210,flexShrink:0,display:'flex',flexDirection:'column',background:'#f0f0f2',borderRadius:18,padding:'12px 10px',maxHeight:'100%'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                    <div style={{width:8,height:8,borderRadius:4,background:col.color}}/>
-                    <span style={{fontSize:12,fontWeight:700,color:'#555'}}>{col.label}</span>
-                    <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,background:'#e0e0e5',color:'#888',borderRadius:99,padding:'1px 6px'}}>{colItems.length}</span>
-                  </div>
-                  <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:8}}>
-                    {colItems.length===0&&<p style={{textAlign:'center',color:'#ccc',fontSize:12,paddingTop:16}}>Vazio</p>}
-                    {colItems.map(item=>(
-                      <div key={item.id} style={{background:'#fff',borderRadius:12,padding:'10px',boxShadow:'0 1px 4px rgba(0,0,0,.07)',borderTop:`3px solid ${getSub(item.materia).color}`}}>
-                        <p style={{fontSize:12,fontWeight:600,color:'#111',marginBottom:6,lineHeight:1.35}}>{item.titulo}</p>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                          <SubChip materia={item.materia} small/>
-                          <div style={{display:'flex',alignItems:'center',gap:4}}>
-                            {item.dataVenc&&<span style={{fontSize:9,color:'#bbb'}}>{item.dataVenc}</span>}
-                            <Avatar owner={item.filho} size={18}/>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>;
 };
 
 // ═══════════════════════════════════════════════════════════════
 // CALENDAR SCREEN
 // ═══════════════════════════════════════════════════════════════
-const CalendarScreen=({itens})=>{
-  const [viewDate,setViewDate]=useState(new Date());
-  const [selected,setSelected]=useState(new Date().getDate());
-
-  const ano=viewDate.getFullYear();
-  const mes=viewDate.getMonth();
-  const primeiroDia=new Date(ano,mes,1).getDay();
-  const diasNoMes=new Date(ano,mes+1,0).getDate();
+const CalendarScreen=({itens,onEdit,onDelete})=>{
+  const [vd,setVd]=useState(new Date());
+  const [sel,setSel]=useState(new Date().getDate());
+  const [detail,setDetail]=useState(null);
+  const ano=vd.getFullYear(),mes=vd.getMonth();
   const cells=[];
-  for(let i=0;i<primeiroDia;i++)cells.push(null);
-  for(let d=1;d<=diasNoMes;d++)cells.push(d);
+  for(let i=0;i<new Date(ano,mes,1).getDay();i++)cells.push(null);
+  for(let d=1;d<=new Date(ano,mes+1,0).getDate();d++)cells.push(d);
+  const itensMes=itens.filter(i=>{const d=parseDate(i.dataVenc);return d&&d.getMonth()===mes&&d.getFullYear()===ano;});
+  const itensDia=d=>itensMes.filter(i=>parseDate(i.dataVenc)?.getDate()===d);
+  const hj=new Date();
 
-  const itensMes=itens.filter(i=>{
-    const dt=parseDate(i.dataVenc);
-    return dt&&dt.getMonth()===mes&&dt.getFullYear()===ano;
-  });
+  if(detail)return<ItemDetalhe item={detail} onClose={()=>setDetail(null)} onEdit={item=>{setDetail(null);onEdit(item);}} onDelete={item=>{setDetail(null);onDelete(item);}}/>;
 
-  const itensDia=(d)=>itensMes.filter(i=>parseDate(i.dataVenc)?.getDate()===d);
-  const selectedItems=itensDia(selected);
-  const hojeD=new Date();
-
-  const prevMes=()=>{setViewDate(new Date(ano,mes-1,1));setSelected(1);};
-  const nextMes=()=>{setViewDate(new Date(ano,mes+1,1));setSelected(1);};
-
-  return(
-    <div className="fade" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'16px 20px 12px',flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-          <button onClick={prevMes} style={{background:'#f0f0f2',border:'none',borderRadius:10,width:34,height:34,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7l4-4" stroke="#555" strokeWidth="1.8" strokeLinecap="round"/></svg>
-          </button>
-          <div style={{textAlign:'center'}}>
-            <h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>{MESES_PT[mes]}</h1>
-            <p style={{fontSize:12,color:'#aaa',fontWeight:500}}>{ano}</p>
-          </div>
-          <button onClick={nextMes} style={{background:'#f0f0f2',border:'none',borderRadius:10,width:34,height:34,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="#555" strokeWidth="1.8" strokeLinecap="round"/></svg>
-          </button>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:6}}>
-          {['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} style={{textAlign:'center',fontSize:11,fontWeight:700,color:'#bbb'}}>{d}</div>)}
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'3px 0'}}>
-          {cells.map((d,i)=>{
-            if(!d)return<div key={i}/>;
-            const isToday=d===hojeD.getDate()&&mes===hojeD.getMonth()&&ano===hojeD.getFullYear();
-            const isSel=d===selected;
-            const evs=itensDia(d);
-            return(
-              <div key={i} onClick={()=>setSelected(d)} style={{cursor:'pointer',padding:'2px'}}>
-                <div style={{width:34,height:34,borderRadius:17,margin:'0 auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:isSel?ACCENT:isToday?ACCENT+'22':'transparent',transition:'background .15s'}}>
-                  <span style={{fontSize:13,fontWeight:isToday||isSel?700:500,color:isSel?'#fff':isToday?ACCENT:'#333',lineHeight:1}}>{d}</span>
-                  {evs.length>0&&!isSel&&(
-                    <div style={{display:'flex',gap:2,marginTop:1}}>
-                      {evs.slice(0,3).map((e,ei)=><div key={ei} style={{width:4,height:4,borderRadius:2,background:getSub(e.materia).color}}/>)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+  return<div className="fade" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{padding:'14px 20px 10px',flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+        <button onClick={()=>{setVd(new Date(ano,mes-1,1));setSel(1);}} style={{background:'#f0f0f2',border:'none',borderRadius:10,width:34,height:34,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7l4-4" stroke="#555" strokeWidth="1.8" strokeLinecap="round"/></svg></button>
+        <div style={{textAlign:'center'}}><h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>{MESES[mes]}</h1><p style={{fontSize:12,color:'#aaa',fontWeight:500}}>{ano}</p></div>
+        <button onClick={()=>{setVd(new Date(ano,mes+1,1));setSel(1);}} style={{background:'#f0f0f2',border:'none',borderRadius:10,width:34,height:34,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="#555" strokeWidth="1.8" strokeLinecap="round"/></svg></button>
       </div>
-      <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
-        <h2 style={{fontSize:14,fontWeight:700,color:'#111',marginBottom:10}}>
-          {selected===hojeD.getDate()&&mes===hojeD.getMonth()?'Hoje':'Dia '+selected} — {selectedItems.length} {selectedItems.length===1?'item':'itens'}
-        </h2>
-        {selectedItems.length===0&&<EmptyState emoji="📅" msg="Nenhum item neste dia"/>}
-        {selectedItems.map(item=>{
-          const s=getSub(item.materia);
-          return(
-            <div key={item.id} style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'center',gap:12,boxShadow:'0 1px 4px rgba(0,0,0,.06)',borderLeft:`3px solid ${s.color}`}}>
-              <div style={{flex:1}}>
-                <p style={{fontSize:13,fontWeight:600,color:'#111',marginBottom:4}}>{item.titulo}</p>
-                <div style={{display:'flex',gap:6,alignItems:'center'}}><SubChip materia={item.materia} small/><Avatar owner={item.filho} size={18}/></div>
-              </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:4}}>
+        {['D','S','T','Q','Q','S','S'].map((d,i)=><div key={i} style={{textAlign:'center',fontSize:11,fontWeight:700,color:'#bbb'}}>{d}</div>)}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px 0'}}>
+        {cells.map((d,i)=>{
+          if(!d)return<div key={i}/>;
+          const isToday=d===hj.getDate()&&mes===hj.getMonth()&&ano===hj.getFullYear();
+          const isSel=d===sel;
+          const evs=itensDia(d);
+          return<div key={i} onClick={()=>setSel(d)} style={{cursor:'pointer',padding:'1px'}}>
+            <div style={{width:34,height:34,borderRadius:17,margin:'0 auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:isSel?ACCENT:isToday?ACCENT+'22':'transparent'}}>
+              <span style={{fontSize:12,fontWeight:isToday||isSel?700:500,color:isSel?'#fff':isToday?ACCENT:'#333',lineHeight:1}}>{d}</span>
+              {evs.length>0&&!isSel&&<div style={{display:'flex',gap:2,marginTop:1}}>{evs.slice(0,3).map((e,ei)=><div key={ei} style={{width:4,height:4,borderRadius:2,background:getSub(e.materia).color}}/>)}</div>}
             </div>
-          );
+          </div>;
         })}
-        {itensMes.filter(i=>parseDate(i.dataVenc)?.getDate()>selected).sort((a,b)=>parseDate(a.dataVenc)-parseDate(b.dataVenc)).length>0&&(
-          <>
-            <h2 style={{fontSize:14,fontWeight:700,color:'#111',margin:'16px 0 10px'}}>Próximos no mês</h2>
-            {itensMes.filter(i=>parseDate(i.dataVenc)?.getDate()>selected).sort((a,b)=>parseDate(a.dataVenc)-parseDate(b.dataVenc)).slice(0,6).map(item=>{
-              const s=getSub(item.materia);
-              const d=parseDate(item.dataVenc);
-              return(
-                <div key={item.id} style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'center',gap:12,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
-                  <div style={{width:38,height:38,borderRadius:10,background:s.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <span style={{fontSize:13,fontWeight:800,color:s.color,lineHeight:1}}>{d.getDate()}</span>
-                    <span style={{fontSize:9,color:s.color,opacity:.7,fontWeight:600}}>{MESES_ABR[d.getMonth()]}</span>
-                  </div>
-                  <div style={{flex:1}}><p style={{fontSize:13,fontWeight:600,color:'#111'}}>{item.titulo}</p><div style={{display:'flex',gap:6,alignItems:'center',marginTop:3}}><SubChip materia={item.materia} small/><Avatar owner={item.filho} size={16}/></div></div>
-                </div>
-              );
-            })}
-          </>
-        )}
       </div>
     </div>
-  );
+    <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
+      <p style={{fontSize:13,fontWeight:700,color:'#111',marginBottom:10}}>Dia {sel} — {itensDia(sel).length} {itensDia(sel).length===1?'item':'itens'}</p>
+      {itensDia(sel).length===0?<EmptyState emoji="📅" msg="Nenhum item neste dia"/>:itensDia(sel).map(item=><ItemCard key={item.id} item={item} onPress={()=>setDetail(item)} onLongPress={()=>{}} onEdit={onEdit} onDelete={onDelete}/>)}
+    </div>
+  </div>;
 };
 
 // ═══════════════════════════════════════════════════════════════
-// AVISOS (COMUNICADOS) SCREEN
+// AVISOS SCREEN
 // ═══════════════════════════════════════════════════════════════
-const AvisosScreen=({comunicados,setComunicados,onDeleteCom})=>{
-  const [open,setOpen]=useState(null);
+const AvisosScreen=({comunicados,setComunicados,onArchive,onDelete,onEdit})=>{
+  const [detail,setDetail]=useState(null);
   const [filho,setFilho]=useState('ambos');
-  const [etiqueta,setEtiqueta]=useState('Todos');
+  const [etiq,setEtiq]=useState('todos');
+  const [verArq,setVerArq]=useState(false);
 
-  const markLido=(id)=>setComunicados(cs=>cs.map(c=>c.id===id?{...c,_lido:true}:c));
-
-  const TIPO_MAP={'Escola':{c:'#3B82F6',bg:'#EFF6FF',e:'🏫'},'Professor(a)':{c:'#16A34A',bg:'#F0FDF4',e:'👩‍🏫'},'Evento':{c:'#D97706',bg:'#FFFBEB',e:'📅'},'Financeiro':{c:'#DC2626',bg:'#FEF2F2',e:'💰'},'Saúde':{c:'#0891B2',bg:'#ECFEFF',e:'🩺'},'Saude':{c:'#0891B2',bg:'#ECFEFF',e:'🩺'}};
-  const getTipo=(t)=>TIPO_MAP[t]||{c:'#888',bg:'#f5f5f7',e:'📌'};
+  const markLido=id=>setComunicados(cs=>cs.map(c=>c.id===id?{...c,_lido:true}:c));
 
   const filtered=comunicados.filter(c=>{
     const matchF=filho==='ambos'||c.filho==='ambos'||c.filho===filho;
-    const matchE=etiqueta==='Todos'||c.etiqueta===etiqueta;
-    return matchF&&matchE;
+    const matchE=etiq==='todos'||c.etiqueta===etiq;
+    const matchArq=verArq?(c.arquivado==='sim'):(c.arquivado!=='sim');
+    return matchF&&matchE&&matchArq;
   }).sort((a,b)=>{
-    if(a.fixado==='sim'&&b.fixado!=='sim')return-1;
-    if(b.fixado==='sim'&&a.fixado!=='sim')return 1;
+    if(!verArq){if(a.etiqueta==='urgente'&&b.etiqueta!=='urgente')return-1;if(b.etiqueta==='urgente'&&a.etiqueta!=='urgente')return 1;}
     const da=parseDate(a.data)||new Date(0),db=parseDate(b.data)||new Date(0);
     return db-da;
   });
 
   const unread=filtered.filter(c=>!c._lido).length;
 
-  if(open!==null){
-    const item=comunicados.find(c=>c.id===open);
-    if(!item)return null;
-    const t=getTipo(item.etiqueta);
-    return(
-      <div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-        <div style={{padding:'16px 20px 10px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-          <BackBtn onPress={()=>setOpen(null)}/>
-          <TipoChip tipo={item.etiqueta}/>
-          {item.filho!=='ambos'&&<div style={{marginLeft:'auto'}}><Avatar owner={item.filho} size={26}/></div>}
-        </div>
-        <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
-          <p style={{fontSize:11,color:'#888',fontWeight:500,marginBottom:4}}>{item.remetente}{item.remetente&&' · '}{item.data}</p>
-          <h1 style={{fontSize:18,fontWeight:800,color:'#111',marginBottom:16,lineHeight:1.3}}>{item.titulo}</h1>
-          <div style={{background:'#fff',borderRadius:16,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
-            <p style={{fontSize:14,color:'#333',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{item.conteudo}</p>
-          </div>
-          <button onClick={()=>onDeleteCom(item.id)} style={{marginTop:20,width:'100%',padding:'12px 0',background:'#FEF2F2',color:'#DC2626',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer'}}>Excluir comunicado</button>
+  if(detail){
+    const t=getEtiq(detail.etiqueta);
+    const isUrgente=detail.etiqueta==='urgente';
+    return<div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{padding:'14px 20px 10px',display:'flex',alignItems:'center',gap:10,background:'#fff',borderBottom:'1px solid #f0f0f0',flexShrink:0}}>
+        <BackBtn onPress={()=>setDetail(null)}/>
+        <EtiqChip etiqueta={detail.etiqueta}/>
+        <div style={{marginLeft:'auto',display:'flex',gap:6}}>
+          <button onClick={()=>{setDetail(null);onEdit(detail);}} style={{background:'#f0f0f2',border:'none',borderRadius:10,padding:'6px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#555'}}>✏️ Editar</button>
+          <button onClick={()=>{onArchive(detail.id);setDetail(null);}} style={{background:'#FFF7ED',border:'none',borderRadius:10,padding:'6px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#D97706'}}>📦 Arquivar</button>
         </div>
       </div>
-    );
+      <div style={{flex:1,overflowY:'auto',padding:20,background:isUrgente?'#FFF5F5':'#f5f5f7'}}>
+        {isUrgente&&<div style={{background:'#FEF2F2',border:'2px solid #DC2626',borderRadius:14,padding:'10px 14px',marginBottom:16,display:'flex',gap:8,alignItems:'center'}}><span className="pulse" style={{fontSize:18}}>🚨</span><span style={{fontSize:12,fontWeight:800,color:'#DC2626'}}>COMUNICADO URGENTE</span></div>}
+        <p style={{fontSize:11,color:'#aaa',fontWeight:500,marginBottom:4}}>{detail.remetente}{detail.remetente&&' · '}{detail.data}</p>
+        <h1 style={{fontSize:18,fontWeight:800,color:'#111',marginBottom:16,lineHeight:1.3}}>{detail.titulo}</h1>
+        <div style={{background:'#fff',borderRadius:16,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+          <p style={{fontSize:14,color:'#333',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{detail.conteudo||'Sem conteúdo.'}</p>
+        </div>
+        <button onClick={()=>{onDelete(detail.id);setDetail(null);}} style={{marginTop:16,width:'100%',padding:'12px 0',background:'#FEF2F2',color:'#DC2626',border:'none',borderRadius:12,fontSize:13,fontWeight:700,cursor:'pointer'}}>🗑 Excluir comunicado</button>
+      </div>
+    </div>;
   }
 
-  return(
-    <div className="fade" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'16px 20px 10px',flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-          <h1 style={{fontSize:22,fontWeight:800,color:'#111'}}>Avisos</h1>
-          {unread>0&&<div style={{background:ACCENT,color:'#fff',fontSize:11,fontWeight:700,borderRadius:99,padding:'2px 8px'}}>{unread}</div>}
-        </div>
-        <div style={{display:'flex',background:'#ebebeb',borderRadius:14,padding:3,marginBottom:10}}>
-          {[['ambos','Ambos'],['iza','Iza'],['israel','Israel']].map(([v,l])=>(
-            <button key={v} onClick={()=>setFilho(v)} style={{flex:1,padding:'7px 0',borderRadius:10,background:filho===v?'#fff':'transparent',border:'none',cursor:'pointer',fontSize:12,fontWeight:700,color:filho===v?'#111':'#999',boxShadow:filho===v?'0 1px 6px rgba(0,0,0,.1)':'none',transition:'all .2s'}}>{l}</button>
-          ))}
-        </div>
-        <div style={{display:'flex',gap:5,overflowX:'auto',paddingBottom:4}}>
-          {['Todos','Escola','Professor(a)','Evento','Financeiro','Saúde'].map(tipo=>{
-            const t=getTipo(tipo);
-            const active=etiqueta===tipo;
-            return(
-              <button key={tipo} onClick={()=>setEtiqueta(tipo)} style={{padding:'5px 10px',borderRadius:99,flexShrink:0,background:active?t.c:'#fff',color:active?'#fff':t.c||'#666',border:`1.5px solid ${active?t.c:'#e0e0e0'}`,fontSize:10,fontWeight:700,cursor:'pointer'}}>{tipo}</button>
-            );
-          })}
-        </div>
+  return<div className="fade" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{padding:'14px 20px 8px',flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Avisos</h1>
+        {unread>0&&<div style={{background:ACCENT,color:'#fff',fontSize:11,fontWeight:700,borderRadius:99,padding:'2px 8px'}}>{unread}</div>}
+        <button onClick={()=>setVerArq(v=>!v)} style={{marginLeft:'auto',background:verArq?'#1E3A5F':'#f0f0f2',border:'none',borderRadius:10,padding:'5px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:verArq?'#fff':'#888'}}>📦 {verArq?'Ver ativos':'Arquivados'}</button>
       </div>
-      <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
-        {filtered.length===0&&<EmptyState emoji="🔕" msg="Nenhum aviso encontrado"/>}
-        {filtered.map(item=>{
-          const t=getTipo(item.etiqueta);
-          return(
-            <div key={item.id} onClick={()=>{markLido(item.id);setOpen(item.id);}} style={{background:'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',opacity:item._lido?.75:1}}>
-              {!item._lido&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:ACCENT}}/>}
-              <div style={{width:36,height:36,borderRadius:10,background:t.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <span style={{fontSize:16}}>{t.e}</span>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:2}}>
-                  <span style={{fontSize:10,fontWeight:700,color:t.c}}>{item.etiqueta}</span>
-                  <span style={{fontSize:10,color:'#bbb'}}>{item.data}</span>
-                </div>
-                <p style={{fontSize:13,fontWeight:item._lido?500:700,color:'#111',marginBottom:2,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.titulo}</p>
-                <p style={{fontSize:11,color:'#aaa',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.remetente||item.filho}</p>
-              </div>
-            </div>
-          );
+      <div style={{display:'flex',background:'#ebebeb',borderRadius:14,padding:3,marginBottom:8}}>
+        {[['ambos','Ambos'],['iza','Iza'],['israel','Israel']].map(([v,l])=><button key={v} onClick={()=>setFilho(v)} style={{flex:1,padding:'6px 0',borderRadius:10,background:filho===v?'#fff':'transparent',border:'none',cursor:'pointer',fontSize:12,fontWeight:700,color:filho===v?'#111':'#999',boxShadow:filho===v?'0 1px 6px rgba(0,0,0,.1)':'none',transition:'all .2s'}}>{l}</button>)}
+      </div>
+      <div style={{display:'flex',gap:5,overflowX:'auto',paddingBottom:4}}>
+        {['todos',...Object.keys(ETIQ)].map(tipo=>{
+          const t=getEtiq(tipo),active=etiq===tipo;
+          return<button key={tipo} onClick={()=>setEtiq(tipo)} style={{padding:'5px 10px',borderRadius:99,flexShrink:0,background:active?(tipo==='urgente'?'#DC2626':t.c||ACCENT):'#fff',color:active?'#fff':(tipo==='urgente'?'#DC2626':t.c||'#666'),border:`1.5px solid ${tipo==='urgente'?'#DC2626':active?t.c||ACCENT:'#e0e0e0'}`,fontSize:10,fontWeight:700,cursor:'pointer'}}>
+            {tipo==='todos'?'Todos':tipo==='urgente'?'🚨 Urgente':t.label}
+          </button>;
         })}
       </div>
     </div>
-  );
+    <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
+      {filtered.length===0&&<EmptyState emoji={verArq?'📦':'🔕'} msg={verArq?'Nenhum comunicado arquivado':'Nenhum aviso encontrado'}/>}
+      {filtered.map(item=>{
+        const t=getEtiq(item.etiqueta);
+        const isUrg=item.etiqueta==='urgente';
+        return<div key={item.id} onClick={()=>{markLido(item.id);setDetail(item);}} style={{background:isUrg?'#FEF2F2':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',border:isUrg?'1.5px solid #DC2626':'1.5px solid transparent'}}>
+          {!item._lido&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:isUrg?'#DC2626':ACCENT}}/>}
+          <div style={{width:36,height:36,borderRadius:10,background:t.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,position:'relative'}}>
+            <span style={{fontSize:16}}>{t.e}</span>
+            {isUrg&&<div className="pulse" style={{position:'absolute',top:-2,right:-2,width:8,height:8,borderRadius:4,background:'#DC2626',border:'2px solid #FEF2F2'}}/>}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:2}}>
+              <span style={{fontSize:10,fontWeight:700,color:isUrg?'#DC2626':t.c}}>{isUrg?'🚨 URGENTE':t.label}</span>
+              <span style={{fontSize:10,color:'#bbb'}}>{item.data}</span>
+            </div>
+            <p style={{fontSize:13,fontWeight:item._lido?500:700,color:isUrg?'#7F1D1D':'#111',marginBottom:2,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.titulo}</p>
+            <p style={{fontSize:11,color:'#aaa',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.remetente||item.filho}</p>
+          </div>
+        </div>;
+      })}
+    </div>
+  </div>;
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -818,263 +733,274 @@ const AvisosScreen=({comunicados,setComunicados,onDeleteCom})=>{
 // ═══════════════════════════════════════════════════════════════
 const BoletimScreen=({notas,setScreen})=>{
   const [aluno,setAluno]=useState('israel');
-  const alunoNotas=notas.filter(n=>n.filho===aluno||n.filho===aluno.charAt(0).toUpperCase()+aluno.slice(1));
+  const [etapaF,setEtapaF]=useState('all');
+  const MEDIA={1:18,2:18,3:24},MAX={1:30,2:30,3:40};
+
+  const alunoNotas=notas.filter(n=>n.filho===aluno||(aluno==='iza'&&n.filho==='Iza')||(aluno==='israel'&&n.filho==='Israel'));
+  const filtNotas=etapaF==='all'?alunoNotas:alunoNotas.filter(n=>n.etapa===etapaF);
 
   const grouped=useMemo(()=>{
     const map={};
-    alunoNotas.forEach(n=>{
-      if(!map[n.materia])map[n.materia]=[];
-      map[n.materia].push(n);
+    filtNotas.forEach(n=>{
+      if(!map[n.materia])map[n.materia]={};
+      if(!map[n.materia][n.etapa])map[n.materia][n.etapa]=[];
+      map[n.materia][n.etapa].push(n);
     });
     return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]));
-  },[alunoNotas]);
+  },[filtNotas]);
 
-  const getNotaColor=(nota)=>{
-    if(nota==='OTM'||nota==='otm')return'#16A34A';
-    const n=parseFloat(nota);
-    if(isNaN(n))return'#888';
-    if(n>=7)return'#16A34A';
-    if(n>=5)return'#D97706';
-    return'#DC2626';
+  const qualitativo=v=>/^[A-Za-z]+$/.test(String(v||''));
+  const conceitoCor={OTM:'#16A34A',MB:'#3B82F6',B:'#D97706',R:'#DC2626'};
+  const notaCor=(n,vA,etapa)=>{
+    if(!n&&n!==0)return'#888';
+    if(qualitativo(n))return conceitoCor[String(n).toUpperCase()]||'#888';
+    const pct=vA>0?parseFloat(n)/vA:0;
+    return pct>=0.6?'#16A34A':pct>=0.4?'#D97706':'#DC2626';
   };
 
-  const turma=aluno==='iza'?'6° Ano A — 2026':'2° Ano A — 2026';
-
-  return(
-    <div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'16px 20px 10px',flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-          <BackBtn onPress={()=>setScreen('home')}/>
-          <h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Boletim</h1>
-        </div>
-        <div style={{display:'flex',background:'#ebebeb',borderRadius:14,padding:4,marginBottom:10}}>
-          {[['israel','Israel',ISRAEL_C],['iza','Iza',IZA_C]].map(([v,l,c])=>(
-            <button key={v} onClick={()=>setAluno(v)} style={{flex:1,padding:'8px 0',borderRadius:10,background:aluno===v?'#fff':'transparent',border:'none',cursor:'pointer',boxShadow:aluno===v?'0 1px 6px rgba(0,0,0,.12)':'none',transition:'all .2s',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-              <div style={{width:16,height:16,borderRadius:8,background:c,opacity:aluno===v?1:.4,display:'flex',alignItems:'center',justifyContent:'center',fontSize:7,fontWeight:700,color:'#fff'}}>{v==='iza'?'I':'Is'}</div>
-              <span style={{fontSize:13,fontWeight:700,color:aluno===v?'#111':'#999'}}>{l}</span>
-            </button>
-          ))}
-        </div>
-        <div style={{background:aluno==='iza'?IZA_C+'18':ISRAEL_C+'18',borderRadius:10,padding:'5px 12px',display:'inline-block'}}>
-          <span style={{fontSize:12,fontWeight:700,color:aluno==='iza'?IZA_C:ISRAEL_C}}>{turma}</span>
-        </div>
+  return<div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{padding:'14px 20px 10px',flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+        <BackBtn onPress={()=>setScreen('home')}/>
+        <h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Boletim</h1>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 2fr auto',padding:'6px 20px',gap:4,background:'#1E3A5F',flexShrink:0}}>
-        {['Bim.','Avaliação','Nota'].map(h=><span key={h} style={{fontSize:11,fontWeight:700,color:'#fff',letterSpacing:.3}}>{h}</span>)}
+      <div style={{display:'flex',background:'#ebebeb',borderRadius:14,padding:4,marginBottom:8}}>
+        {[['israel','Israel',ISRAEL_C],['iza','Iza',IZA_C]].map(([v,l,c])=><button key={v} onClick={()=>setAluno(v)} style={{flex:1,padding:'7px 0',borderRadius:10,background:aluno===v?'#fff':'transparent',border:'none',cursor:'pointer',boxShadow:aluno===v?'0 1px 6px rgba(0,0,0,.12)':'none',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .2s'}}>
+          <div style={{width:14,height:14,borderRadius:7,background:c,opacity:aluno===v?1:.4,display:'flex',alignItems:'center',justifyContent:'center',fontSize:7,fontWeight:700,color:'#fff'}}>{v==='iza'?'I':'Is'}</div>
+          <span style={{fontSize:13,fontWeight:700,color:aluno===v?'#111':'#999'}}>{l}</span>
+        </button>)}
       </div>
-      <div style={{flex:1,overflowY:'auto'}}>
-        {grouped.length===0&&<EmptyState emoji="📊" msg="Nenhuma nota lançada ainda"/>}
-        {grouped.map(([mat,avs])=>{
-          const s=getSub(mat);
-          const total=avs.reduce((sum,a)=>{const n=parseFloat(a.nota);return isNaN(n)?sum:sum+n;},0);
-          const hasNum=avs.some(a=>!isNaN(parseFloat(a.nota)));
-          return(
-            <div key={mat}>
-              <div style={{background:s.bg,borderLeft:`4px solid ${s.color}`,padding:'7px 20px'}}>
-                <span style={{fontSize:13,fontWeight:700,color:s.color}}>{mat}</span>
-              </div>
-              {avs.map((av,i)=>(
-                <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 2fr auto',padding:'7px 20px',gap:4,background:i%2===0?'#fff':'#fafafa',borderBottom:'1px solid #f0f0f0',alignItems:'center'}}>
-                  <span style={{fontSize:12,color:'#888',fontWeight:500}}>{av.bimestre}°</span>
-                  <span style={{fontSize:11,color:'#444',fontWeight:500,lineHeight:1.3}}>{av.atividade}</span>
-                  <span style={{fontSize:13,fontWeight:700,color:getNotaColor(av.nota),textAlign:'right'}}>{av.nota}</span>
-                </div>
-              ))}
-              {hasNum&&(
-                <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',padding:'6px 20px',background:'#F8FAFF',borderBottom:'2px solid #e8edf5',gap:8}}>
-                  <span style={{fontSize:11,fontWeight:600,color:'#888'}}>Total da etapa:</span>
-                  <span style={{fontSize:14,fontWeight:800,color:'#1E3A5F'}}>{total.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div style={{display:'flex',gap:4}}>
+        {[['all','Todas'],['1','1ª'],['2','2ª'],['3','3ª']].map(([v,l])=><button key={v} onClick={()=>setEtapaF(v)} style={{flex:1,padding:'6px 0',borderRadius:8,background:etapaF===v?'#1E3A5F':'#f0f0f2',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:etapaF===v?'#fff':'#888'}}>{l}</button>)}
       </div>
     </div>
-  );
+    <div style={{display:'grid',gridTemplateColumns:'36px 1fr auto',padding:'6px 16px',background:'#1E3A5F',flexShrink:0,gap:4}}>
+      {['Etapa','Avaliação','Nota'].map(h=><span key={h} style={{fontSize:11,fontWeight:700,color:'#fff'}}>{h}</span>)}
+    </div>
+    <div style={{flex:1,overflowY:'auto'}}>
+      {grouped.length===0&&<EmptyState emoji="📊" msg="Nenhuma nota encontrada"/>}
+      {grouped.map(([mat,etapas])=>{
+        const s=getSub(mat);
+        return<div key={mat}>
+          <div style={{background:s.bg,borderLeft:`4px solid ${s.color}`,padding:'7px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <span style={{fontSize:13,fontWeight:700,color:s.color}}>{s.label}</span>
+          </div>
+          {Object.entries(etapas).sort().map(([etapa,avs])=>{
+            const numNotas=avs.filter(a=>!qualitativo(a.nota)&&a.nota!=='');
+            const total=numNotas.reduce((s,a)=>s+parseFloat(a.nota||0),0);
+            const media=MEDIA[parseInt(etapa)]||18;
+            const max=MAX[parseInt(etapa)]||30;
+            const totalOk=total>=media;
+            return<div key={etapa}>
+              {avs.map((av,i)=><div key={i} style={{display:'grid',gridTemplateColumns:'36px 1fr auto',padding:'7px 16px',gap:4,background:i%2===0?'#fff':'#fafafa',borderBottom:'1px solid #f0f0f0',alignItems:'center'}}>
+                <span style={{fontSize:11,color:'#888',fontWeight:500}}>{av.etapa}ª</span>
+                <div>
+                  <span style={{fontSize:11,color:'#333',fontWeight:500}}>{av.atividade}</span>
+                  {av.valor_atividade&&<span style={{fontSize:9,color:'#bbb',marginLeft:4}}>[{av.valor_atividade}]</span>}
+                </div>
+                <span style={{fontSize:13,fontWeight:700,color:notaCor(av.nota,parseFloat(av.valor_atividade||0),etapa),textAlign:'right'}}>{av.nota||'—'}</span>
+              </div>)}
+              {numNotas.length>0&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 16px',background:'#F8FAFF',borderBottom:'2px solid #e8edf5'}}>
+                <span style={{fontSize:11,fontWeight:600,color:'#888'}}>Total {etapa}ª etapa · mín. {media}/{max}</span>
+                <span style={{fontSize:14,fontWeight:800,color:totalOk?'#16A34A':'#DC2626'}}>{total.toFixed(2)}{!totalOk&&' ⚠'}</span>
+              </div>}
+            </div>;
+          })}
+        </div>;
+      })}
+    </div>
+  </div>;
 };
 
 // ═══════════════════════════════════════════════════════════════
-// HORÁRIO SCREEN
+// PROVAS SCREEN
+// ═══════════════════════════════════════════════════════════════
+const ProvasScreen=({itens,notas,onToggle,onEdit,onDelete,setScreen})=>{
+  const [view,setView]=useState('agenda');
+  const [filho,setFilho]=useState('all');
+  const [etapaF,setEtapaF]=useState('all');
+  const [detail,setDetail]=useState(null);
+  const now=new Date();now.setHours(0,0,0,0);
+  const mon=getMonday();
+  const sun=addDays(mon,6);
+  const mon2=addDays(mon,7);
+  const sun2=addDays(mon,13);
+
+  // Provas futuras (de itens)
+  const provasFuturas=itens.filter(i=>i.tipo==='prova'&&(filho==='all'||i.filho===filho||i.filho==='ambos')&&(etapaF==='all'||i.etapa===etapaF));
+  // Provas passadas (de notas)
+  const provasPassadas=notas.filter(n=>n.atividade?.includes('PROVA')&&(filho==='all'||n.filho===filho)&&(etapaF==='all'||n.etapa===etapaF));
+
+  if(detail)return<ItemDetalhe item={detail} onClose={()=>setDetail(null)} onEdit={item=>{setDetail(null);onEdit(item);}} onDelete={item=>{setDetail(null);onDelete(item);}}/>;
+
+  const ProvaFuturaCard=({item})=>{
+    const s=getSub(item.materia);
+    const d=parseDate(item.dataVenc);
+    const done=item.status==='concluido';
+    return<div onClick={()=>setDetail(item)} style={{background:done?'#F0FDF4':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',gap:12,alignItems:'center',boxShadow:'0 1px 4px rgba(0,0,0,.06)',borderLeft:`3px solid ${s.color}`,cursor:'pointer',opacity:done?.7:1}}>
+      {d&&<div style={{width:44,height:44,borderRadius:12,background:s.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+        <span style={{fontSize:14,fontWeight:800,color:s.color,lineHeight:1}}>{d.getDate()}</span>
+        <span style={{fontSize:9,color:s.color,opacity:.7}}>{DIAS[d.getDay()]}</span>
+      </div>}
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{fontSize:13,fontWeight:600,color:'#111',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.titulo}</p>
+        <div style={{display:'flex',gap:5,alignItems:'center'}}><SubChip materia={item.materia} small/>{item.etapa&&<span style={{fontSize:9,fontWeight:600,background:'#e8edf5',color:'#1E3A5F',borderRadius:20,padding:'1px 5px'}}>{item.etapa}ª</span>}<Avatar owner={item.filho} size={16}/></div>
+      </div>
+      <button onClick={e=>{e.stopPropagation();onToggle(item);}} style={{width:24,height:24,borderRadius:12,background:done?ACCENT:'transparent',border:`2px solid ${done?ACCENT:'#ccc'}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,flexShrink:0}}>
+        {done&&<svg width="11" height="11" viewBox="0 0 11 11"><polyline points="2,5.5 4.5,8 9,3" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round"/></svg>}
+      </button>
+    </div>;
+  };
+
+  const WeekBlock=({title,start,end,highlight})=>{
+    const dias=[];for(let d=new Date(start);d<=end;d=addDays(d,1))dias.push(new Date(d));
+    const hasProvas=dias.some(d=>provasFuturas.some(p=>{const pd=parseDate(p.dataVenc);return pd&&fmtDate(pd)===fmtDate(d);}));
+    if(!hasProvas&&!highlight)return<div style={{background:'#f0f0f2',borderRadius:14,padding:'12px 14px',marginBottom:10}}><p style={{fontSize:12,fontWeight:600,color:'#bbb',textAlign:'center'}}>{title} — nenhuma prova 🎉</p></div>;
+    return<div style={{marginBottom:12}}>
+      <p style={{fontSize:12,fontWeight:700,color:'#1E3A5F',marginBottom:8,padding:'0 4px'}}>{title}</p>
+      {dias.map(d=>{
+        const ds=fmtDate(d);
+        const dProvas=provasFuturas.filter(p=>parseDate(p.dataVenc)&&fmtDate(parseDate(p.dataVenc))===ds);
+        if(!dProvas.length)return null;
+        const isToday=ds===hoje();
+        return<div key={ds}>
+          <div style={{display:'flex',alignItems:'center',gap:6,margin:'6px 0 4px'}}>
+            <div style={{width:24,height:24,borderRadius:12,background:isToday?ACCENT:'#e8edf5',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:10,fontWeight:700,color:isToday?'#fff':'#1E3A5F'}}>{d.getDate()}</span></div>
+            <span style={{fontSize:11,fontWeight:600,color:isToday?ACCENT:'#666'}}>{DIAS[d.getDay()]}{isToday?' · Hoje':''}</span>
+          </div>
+          {dProvas.map(p=><ProvaFuturaCard key={p.id} item={p}/>)}
+        </div>;
+      })}
+    </div>;
+  };
+
+  const allSorted=[...provasFuturas].sort((a,b)=>{
+    const da=parseDate(a.dataVenc)||new Date(9999,0);
+    const db=parseDate(b.dataVenc)||new Date(9999,0);
+    return da-db;
+  });
+
+  return<div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{padding:'14px 20px 8px',flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+        <BackBtn onPress={()=>setScreen('home')}/>
+        <h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Provas</h1>
+      </div>
+      <div style={{display:'flex',background:'#ebebeb',borderRadius:12,padding:3,marginBottom:8}}>
+        {[['agenda','📅 Agenda'],['lista','📋 Lista']].map(([v,l])=><button key={v} onClick={()=>setView(v)} style={{flex:1,padding:'6px 0',borderRadius:9,background:view===v?'#fff':'transparent',border:'none',cursor:'pointer',fontSize:12,fontWeight:700,color:view===v?'#111':'#999',boxShadow:view===v?'0 1px 4px rgba(0,0,0,.1)':'none',transition:'all .2s'}}>{l}</button>)}
+      </div>
+      <div style={{display:'flex',gap:6}}>
+        <div style={{display:'flex',gap:4,flex:1}}>
+          {[['all','Todos'],['iza','Iza'],['israel','Israel']].map(([v,l])=><button key={v} onClick={()=>setFilho(v)} style={{flex:1,padding:'5px 0',borderRadius:8,background:filho===v?ACCENT:'#f0f0f2',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:filho===v?'#fff':'#888'}}>{l}</button>)}
+        </div>
+        <div style={{display:'flex',gap:4}}>
+          {[['all','Todas'],['1','1ª'],['2','2ª'],['3','3ª']].map(([v,l])=><button key={v} onClick={()=>setEtapaF(v)} style={{padding:'5px 8px',borderRadius:8,background:etapaF===v?'#1E3A5F':'#f0f0f2',border:'none',cursor:'pointer',fontSize:11,fontWeight:700,color:etapaF===v?'#fff':'#888'}}>{l}</button>)}
+        </div>
+      </div>
+    </div>
+    <div style={{flex:1,overflowY:'auto',padding:'0 20px'}}>
+      {view==='agenda'?(<>
+        <WeekBlock title={`Esta semana (${fmtDate(mon)} – ${fmtDate(sun)})`} start={mon} end={sun} highlight/>
+        <WeekBlock title={`Próxima semana (${fmtDate(mon2)} – ${fmtDate(sun2)})`} start={mon2} end={sun2}/>
+        {provasFuturas.filter(p=>{const d=parseDate(p.dataVenc);return d&&d>sun2;}).length>0&&<>
+          <p style={{fontSize:12,fontWeight:700,color:'#1E3A5F',marginBottom:8,padding:'0 4px'}}>Próximas etapas</p>
+          {provasFuturas.filter(p=>{const d=parseDate(p.dataVenc);return d&&d>sun2;}).sort((a,b)=>parseDate(a.dataVenc)-parseDate(b.dataVenc)).map(p=><ProvaFuturaCard key={p.id} item={p}/>)}
+        </>}
+        {provasFuturas.filter(p=>!p.dataVenc).length>0&&<>
+          <p style={{fontSize:12,fontWeight:700,color:'#aaa',marginTop:8,marginBottom:8}}>Sem data definida</p>
+          {provasFuturas.filter(p=>!p.dataVenc).map(p=><ProvaFuturaCard key={p.id} item={p}/>)}
+        </>}
+        {provasFuturas.length===0&&<EmptyState emoji="📝" msg="Nenhuma prova cadastrada"/>}
+      </>):(
+        <>
+          {allSorted.length===0&&provasPassadas.length===0&&<EmptyState emoji="📝" msg="Nenhuma prova encontrada"/>}
+          {allSorted.length>0&&<><p style={{fontSize:12,fontWeight:700,color:'#1E3A5F',marginBottom:8}}>Próximas</p>{allSorted.map(p=><ProvaFuturaCard key={p.id} item={p}/>)}</>}
+          {provasPassadas.length>0&&<><p style={{fontSize:12,fontWeight:700,color:'#888',margin:'12px 0 8px'}}>Realizadas (boletim)</p>
+            {provasPassadas.map((n,i)=>{const s=getSub(n.materia);return<div key={i} style={{background:'#fff',borderRadius:12,padding:'10px 14px',marginBottom:7,display:'flex',gap:10,alignItems:'center',boxShadow:'0 1px 4px rgba(0,0,0,.06)',borderLeft:`3px solid ${s.color}`}}>
+              <div style={{flex:1}}><p style={{fontSize:12,fontWeight:600,color:'#555'}}>{n.atividade}</p><div style={{display:'flex',gap:5,alignItems:'center',marginTop:3}}><SubChip materia={n.materia} small/><span style={{fontSize:9,fontWeight:600,background:'#e8edf5',color:'#1E3A5F',borderRadius:20,padding:'1px 5px'}}>{n.etapa}ª</span><Avatar owner={n.filho} size={16}/></div></div>
+              <span style={{fontSize:16,fontWeight:800,color:parseFloat(n.nota)>=(parseFloat(n.valor_atividade)*0.6)?'#16A34A':'#DC2626'}}>{n.nota}</span>
+            </div>;})}
+          </>}
+        </>
+      )}
+    </div>
+  </div>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// HORÁRIO + CONFIGS (compactos)
 // ═══════════════════════════════════════════════════════════════
 const HorarioScreen=({setScreen})=>{
   const [aluno,setAluno]=useState('iza');
   const data=HORARIOS[aluno];
-  const todayIdx=(new Date().getDay()+6)%7; // 0=seg, 4=sex, 5/6=fim de semana
-
-  return(
-    <div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'16px 20px 10px',flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-          <BackBtn onPress={()=>setScreen('home')}/>
-          <h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Horário</h1>
-          <span style={{fontSize:11,fontWeight:600,color:'#aaa',marginLeft:4}}>{data.periodo}</span>
-        </div>
-        <div style={{display:'flex',background:'#ebebeb',borderRadius:14,padding:4,marginBottom:4}}>
-          {[['iza','Iza',IZA_C],['israel','Israel',ISRAEL_C]].map(([v,l,c])=>(
-            <button key={v} onClick={()=>setAluno(v)} style={{flex:1,padding:'7px 0',borderRadius:10,background:aluno===v?'#fff':'transparent',border:'none',cursor:'pointer',boxShadow:aluno===v?'0 1px 6px rgba(0,0,0,.12)':'none',transition:'all .2s',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
-              <div style={{width:14,height:14,borderRadius:7,background:c,opacity:aluno===v?1:.4,display:'flex',alignItems:'center',justifyContent:'center',fontSize:7,fontWeight:700,color:'#fff'}}>{v==='iza'?'I':'Is'}</div>
-              <span style={{fontSize:12,fontWeight:700,color:aluno===v?'#111':'#999'}}>{l} — {data.turma}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{flex:1,overflowY:'auto'}}>
-        <div style={{display:'grid',gridTemplateColumns:'56px repeat(5,1fr)',position:'sticky',top:0,zIndex:5,background:'#fff',borderBottom:'2px solid #e8e8e8'}}>
-          <div style={{padding:'8px 4px'}}/>
-          {['Seg','Ter','Qua','Qui','Sex'].map((d,i)=>(
-            <div key={i} style={{padding:'8px 2px',textAlign:'center',background:i===todayIdx&&todayIdx<5?ACCENT+'15':'transparent'}}>
-              <span style={{fontSize:12,fontWeight:700,color:i===todayIdx&&todayIdx<5?ACCENT:'#666'}}>{d}</span>
-            </div>
-          ))}
-        </div>
-        {data.grade.map((row,hi)=>{
-          const isRecreo=data.faixas[hi]==='RECREIO';
-          return(
-            <div key={hi} style={{display:'grid',gridTemplateColumns:'56px repeat(5,1fr)',borderBottom:'1px solid #f0f0f0',background:isRecreo?'#FFF7ED':hi%2===0?'#fff':'#fafafa',minHeight:isRecreo?30:54}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'4px 2px',borderRight:'1px solid #e8e8e8'}}>
-                <span style={{fontSize:isRecreo?9:9.5,fontWeight:600,color:isRecreo?'#D97706':'#aaa',textAlign:'center',lineHeight:1.3}}>{data.faixas[hi]}</span>
-              </div>
-              {isRecreo?(
-                <div style={{gridColumn:'2/7',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <span style={{fontSize:11,fontWeight:700,color:'#D97706',letterSpacing:.5}}>— RECREIO —</span>
-                </div>
-              ):(
-                row.map((mat,di)=>{
-                  const s=mat?getSub(mat):null;
-                  const isToday=di===todayIdx&&todayIdx<5;
-                  return(
-                    <div key={di} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3px 2px',background:isToday?ACCENT+'10':'transparent',borderRight:di<4?'1px solid #f0f0f0':'none'}}>
-                      {s&&mat?(
-                        <div style={{background:s.bg,borderRadius:6,padding:'3px 2px',width:'100%',textAlign:'center',borderLeft:`2px solid ${s.color}`}}>
-                          <span style={{fontSize:8,fontWeight:700,color:s.color,lineHeight:1.3,display:'block'}}>{s.label}</span>
-                        </div>
-                      ):(
-                        <span style={{fontSize:10,color:'#ddd'}}>—</span>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          );
-        })}
-        <div style={{padding:'12px 16px 20px'}}>
-          <p style={{fontSize:10,fontWeight:700,color:'#bbb',marginBottom:8,letterSpacing:.3}}>LEGENDA</p>
-          <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-            {[...new Set(data.grade.flat().filter(Boolean))].map(mat=>{
-              const s=getSub(mat);
-              return(
-                <div key={mat} style={{display:'flex',alignItems:'center',gap:3,background:s.bg,borderRadius:20,padding:'2px 8px'}}>
-                  <div style={{width:5,height:5,borderRadius:3,background:s.color}}/>
-                  <span style={{fontSize:9,fontWeight:700,color:s.color}}>{s.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+  const todayIdx=(new Date().getDay()+6)%7;
+  return<div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{padding:'14px 20px 10px',flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><BackBtn onPress={()=>setScreen('home')}/><h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Horário</h1><span style={{fontSize:11,color:'#aaa',fontWeight:500}}>{data.periodo}</span></div>
+      <div style={{display:'flex',background:'#ebebeb',borderRadius:14,padding:4}}>
+        {[['iza','Iza — '+HORARIOS.iza.turma,IZA_C],['israel','Israel — '+HORARIOS.israel.turma,ISRAEL_C]].map(([v,l,c])=><button key={v} onClick={()=>setAluno(v)} style={{flex:1,padding:'7px 0',borderRadius:10,background:aluno===v?'#fff':'transparent',border:'none',cursor:'pointer',boxShadow:aluno===v?'0 1px 6px rgba(0,0,0,.12)':'none',transition:'all .2s',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
+          <div style={{width:12,height:12,borderRadius:6,background:c,opacity:aluno===v?1:.4}}/>
+          <span style={{fontSize:11,fontWeight:700,color:aluno===v?'#111':'#999'}}>{l}</span>
+        </button>)}
       </div>
     </div>
-  );
+    <div style={{flex:1,overflowY:'auto'}}>
+      <div style={{display:'grid',gridTemplateColumns:'72px repeat(5,1fr)',position:'sticky',top:0,zIndex:5,background:'#fff',borderBottom:'2px solid #e8e8e8'}}>
+        <div/>
+        {['Seg','Ter','Qua','Qui','Sex'].map((d,i)=><div key={i} style={{padding:'8px 2px',textAlign:'center',background:i===todayIdx&&todayIdx<5?ACCENT+'15':'transparent'}}><span style={{fontSize:12,fontWeight:700,color:i===todayIdx&&todayIdx<5?ACCENT:'#666'}}>{d}</span></div>)}
+      </div>
+      {data.grade.map((row,hi)=>{
+        const isRec=data.faixas[hi]==='RECREIO';
+        return<div key={hi} style={{display:'grid',gridTemplateColumns:'72px repeat(5,1fr)',borderBottom:'1px solid #f0f0f0',background:isRec?'#FFF7ED':hi%2===0?'#fff':'#fafafa',minHeight:isRec?28:52}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3px 4px',borderRight:'1px solid #e8e8e8'}}>
+            <span style={{fontSize:isRec?9:8.5,fontWeight:600,color:isRec?'#D97706':'#aaa',textAlign:'center',lineHeight:1.2}}>{data.faixas[hi]}</span>
+          </div>
+          {isRec?<div style={{gridColumn:'2/7',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:11,fontWeight:700,color:'#D97706',letterSpacing:.5}}>— RECREIO —</span></div>:
+            row.map((mat,di)=>{const s=mat?getSub(mat):null;const isT=di===todayIdx&&todayIdx<5;return<div key={di} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'2px 2px',background:isT?ACCENT+'10':'transparent',borderRight:di<4?'1px solid #f0f0f0':'none'}}>
+              {s&&mat?<div style={{background:s.bg,borderRadius:5,padding:'2px 2px',width:'100%',textAlign:'center',borderLeft:`2px solid ${s.color}`}}><span style={{fontSize:7.5,fontWeight:700,color:s.color,lineHeight:1.2,display:'block'}}>{s.label}</span></div>:<span style={{fontSize:10,color:'#ddd'}}>—</span>}
+            </div>;})
+          }
+        </div>;
+      })}
+    </div>
+  </div>;
 };
 
-// ═══════════════════════════════════════════════════════════════
-// CONFIGS SCREEN
-// ═══════════════════════════════════════════════════════════════
 const ConfigsScreen=({setScreen,onSync})=>{
   const cfg=getConfig();
   const [form,setForm]=useState({apiUrl:cfg.apiUrl,token:cfg.token,wa:cfg.wa});
   const [saved,setSaved]=useState(false);
-
-  const handleSave=()=>{
-    saveConfig(form);
-    setSaved(true);
-    setTimeout(()=>setSaved(false),2000);
-  };
-
+  const handleSave=()=>{saveConfig(form);setSaved(true);setTimeout(()=>setSaved(false),2000);};
   const inp={width:'100%',padding:'11px 14px',border:'1.5px solid #e5e7eb',borderRadius:12,fontSize:13,background:'#fafafa',outline:'none',fontFamily:'inherit'};
   const lbl={fontSize:12,fontWeight:700,color:'#555',marginBottom:5,display:'block'};
-
-  return(
-    <div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'16px 20px 12px',flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <BackBtn onPress={()=>setScreen('home')}/>
-          <h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Configurações</h1>
+  return<div className="slideRight" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{padding:'14px 20px 12px',flexShrink:0}}><div style={{display:'flex',alignItems:'center',gap:10}}><BackBtn onPress={()=>setScreen('home')}/><h1 style={{fontSize:20,fontWeight:800,color:'#111'}}>Configurações</h1></div></div>
+    <div style={{flex:1,overflowY:'auto',padding:'0 20px',display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{background:'#fff',borderRadius:16,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+        <p style={{fontSize:13,fontWeight:700,color:'#111',marginBottom:12}}>🔗 Apps Script</p>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <div><label style={lbl}>URL do Web App</label><input style={inp} value={form.apiUrl} onChange={e=>setForm(f=>({...f,apiUrl:e.target.value}))}/></div>
+          <div><label style={lbl}>Token de segurança</label><input style={{...inp,letterSpacing:2}} value={form.token} onChange={e=>setForm(f=>({...f,token:e.target.value}))} type="password" placeholder="Deixe em branco se não configurado"/></div>
         </div>
       </div>
-      <div style={{flex:1,overflowY:'auto',padding:'0 20px',display:'flex',flexDirection:'column',gap:16}}>
-        <div style={{background:'#fff',borderRadius:16,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
-          <p style={{fontSize:13,fontWeight:700,color:'#111',marginBottom:12}}>🔗 Apps Script</p>
-          <div style={{display:'flex',flexDirection:'column',gap:10}}>
-            <div><label style={lbl}>URL do Web App</label><input style={inp} value={form.apiUrl} onChange={e=>setForm(f=>({...f,apiUrl:e.target.value}))} placeholder={DEFAULT_API}/></div>
-            <div><label style={lbl}>Token de segurança</label><input style={{...inp,letterSpacing:2}} value={form.token} onChange={e=>setForm(f=>({...f,token:e.target.value}))} placeholder="Seu token de 11 caracteres" type="password"/></div>
-          </div>
-        </div>
-        <div style={{background:'#fff',borderRadius:16,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
-          <p style={{fontSize:13,fontWeight:700,color:'#111',marginBottom:12}}>📲 WhatsApp</p>
-          <div><label style={lbl}>Número (com DDI, ex: 5531999999999)</label><input style={inp} value={form.wa} onChange={e=>setForm(f=>({...f,wa:e.target.value}))} placeholder="5531999999999" type="tel"/></div>
-          <p style={{fontSize:11,color:'#aaa',marginTop:6}}>Usado pelo botão de compartilhar resumo na tela inicial.</p>
-        </div>
-        <button onClick={handleSave} style={{width:'100%',padding:'14px 0',background:saved?'#16A34A':ACCENT,color:'#fff',border:'none',borderRadius:14,fontSize:15,fontWeight:800,cursor:'pointer',transition:'background .3s'}}>
-          {saved?'✓ Salvo!':'Salvar configurações'}
-        </button>
-        <button onClick={onSync} style={{width:'100%',padding:'13px 0',background:'#fff',color:'#555',border:'1.5px solid #e0e0e0',borderRadius:14,fontSize:14,fontWeight:700,cursor:'pointer'}}>
-          🔄 Sincronizar agora
-        </button>
-        <div style={{background:'#FFF7ED',borderRadius:14,padding:'12px 14px',border:'1px solid #FED7AA'}}>
-          <p style={{fontSize:12,fontWeight:700,color:'#D97706',marginBottom:4}}>ℹ️ Como funciona</p>
-          <p style={{fontSize:12,color:'#92400E',lineHeight:1.6}}>Toda edição feita diretamente na planilha do Google Sheets aparece no app após sincronizar. O app sempre busca os dados do servidor ao abrir.</p>
-        </div>
+      <div style={{background:'#fff',borderRadius:16,padding:16,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+        <p style={{fontSize:13,fontWeight:700,color:'#111',marginBottom:12}}>📲 WhatsApp</p>
+        <div><label style={lbl}>Número (com DDI, ex: 5531999999999)</label><input style={inp} value={form.wa} onChange={e=>setForm(f=>({...f,wa:e.target.value}))} type="tel" placeholder="5531999999999"/></div>
+      </div>
+      <button onClick={handleSave} style={{width:'100%',padding:'14px 0',background:saved?'#16A34A':ACCENT,color:'#fff',border:'none',borderRadius:14,fontSize:15,fontWeight:800,cursor:'pointer',transition:'background .3s'}}>{saved?'✓ Salvo!':'Salvar configurações'}</button>
+      <button onClick={onSync} style={{width:'100%',padding:'13px 0',background:'#fff',color:'#555',border:'1.5px solid #e0e0e0',borderRadius:14,fontSize:14,fontWeight:700,cursor:'pointer'}}>🔄 Sincronizar agora</button>
+      <div style={{background:'#FFF7ED',borderRadius:14,padding:'12px 14px',border:'1px solid #FED7AA'}}>
+        <p style={{fontSize:12,fontWeight:700,color:'#D97706',marginBottom:4}}>ℹ️ Após reinstalar o app</p>
+        <p style={{fontSize:12,color:'#92400E',lineHeight:1.6}}>As configurações ficam no dispositivo e precisam ser refeitas ao reinstalar o app. A URL padrão já vem preenchida.</p>
       </div>
     </div>
-  );
+  </div>;
 };
-
-// ── Hook: detecta SW update ────────────────────────────────────
-const useSwUpdate = () => {
-  const [ready, setReady] = useState(window.__swUpdateReady || false);
-  useEffect(() => {
-    const handler = () => setReady(true);
-    document.addEventListener('swUpdateReady', handler);
-    return () => document.removeEventListener('swUpdateReady', handler);
-  }, []);
-  const applyUpdate = () => {
-    navigator.serviceWorker.getRegistration().then(reg => {
-      if (reg && reg.waiting) {
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-      } else {
-        window.location.reload();
-      }
-    });
-  };
-  return { ready, applyUpdate };
-};
-
-const UpdateBanner = ({ applyUpdate }) => (
-  <div className="slideUp" style={{
-    position:'fixed', top:0, left:0, right:0, zIndex:500,
-    background:'#1E3A5F', padding:'10px 16px',
-    display:'flex', alignItems:'center', justifyContent:'space-between',
-    boxShadow:'0 2px 12px rgba(0,0,0,.3)',
-  }}>
-    <div style={{display:'flex',alignItems:'center',gap:8}}>
-      <span style={{fontSize:16}}>🆕</span>
-      <span style={{fontSize:13,fontWeight:600,color:'#fff'}}>Nova versão disponível</span>
-    </div>
-    <button onClick={applyUpdate} style={{
-      background:ACCENT, color:'#fff', border:'none',
-      borderRadius:20, padding:'6px 14px',
-      fontSize:12, fontWeight:700, cursor:'pointer',
-    }}>Atualizar</button>
-  </div>
-);
 
 // ═══════════════════════════════════════════════════════════════
 // APP ROOT
 // ═══════════════════════════════════════════════════════════════
 const App=()=>{
-  const {ready:swReady, applyUpdate}=useSwUpdate();
   const [screen,setScreen]=useState('home');
   const [itens,setItens]=useState([]);
   const [notas,setNotas]=useState([]);
@@ -1083,18 +1009,19 @@ const App=()=>{
   const [syncLoading,setSyncLoading]=useState(false);
   const [error,setError]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
+  const [editItem,setEditItem]=useState(null);
   const [addLoading,setAddLoading]=useState(false);
   const [showMais,setShowMais]=useState(false);
   const [toast,setToast]=useState(null);
+  const [confirm,setConfirm]=useState(null);
+  const [longPress,setLongPress]=useState(null);
+  const [tasksFilter,setTasksFilter]=useState({});
+  const {ready:swReady,apply:applyUpdate}=useSwUpdate();
 
-  const showToast=(msg,type='ok')=>{
-    setToast({msg,type});
-    setTimeout(()=>setToast(null),2500);
-  };
+  const showToast=(msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),2500);};
 
   const fetchData=useCallback(async(silent=false)=>{
-    if(!silent)setLoading(true);
-    else setSyncLoading(true);
+    if(!silent)setLoading(true); else setSyncLoading(true);
     setError(null);
     try{
       const data=await apiGet();
@@ -1102,180 +1029,147 @@ const App=()=>{
       setNotas(data.notas||[]);
       setComunicados((data.comunicados||[]).map(c=>({...c,_lido:false})));
       if(silent)showToast('Sincronizado ✓');
-    }catch(e){
-      if(!silent)setError(e.message);
-      else showToast('Erro ao sincronizar','err');
-    }finally{
-      setLoading(false);
-      setSyncLoading(false);
-    }
+    }catch(e){if(!silent)setError(e.message);else showToast('Erro: '+e.message,'err');}
+    finally{setLoading(false);setSyncLoading(false);}
   },[]);
 
   useEffect(()=>{fetchData();},[]);
 
   const handleToggle=async(item)=>{
-    const newStatus=item.status==='concluido'||item.status==='concluído'?'pendente':'concluido';
-    setItens(its=>its.map(i=>i.id===item.id?{...i,status:newStatus}:i));
-    try{await apiUpdate('Itens',item.id,{status:newStatus});}
-    catch(e){setItens(its=>its.map(i=>i.id===item.id?{...i,status:item.status}:i));showToast('Erro ao atualizar','err');}
+    const ns=item.status==='concluido'?'pendente':'concluido';
+    setItens(its=>its.map(i=>i.id===item.id?{...i,status:ns}:i));
+    try{await apiUpdate('Itens',item.id,{status:ns});}
+    catch(e){setItens(its=>its.map(i=>i.id===item.id?{...i,status:item.status}:i));showToast('Erro','err');}
   };
 
-  const handleDelete=async(aba,id)=>{
-    if(aba==='Itens'){setItens(its=>its.filter(i=>i.id!==id));}
-    else{setComunicados(cs=>cs.filter(c=>c.id!==id));}
-    try{await apiDelete(aba,id);showToast('Excluído');}
-    catch(e){fetchData(true);showToast('Erro ao excluir','err');}
-  };
-
-  const handleDeleteCom=(id)=>handleDelete('Comunicados',id);
-
-  const handleAdd=async(tipo,dados)=>{
+  const handleSaveItem=async(tipo,dados)=>{
     setAddLoading(true);
     try{
-      const aba=tipo==='item'?'Itens':'Comunicados';
-      const res=await apiAdd(aba,dados);
+      if(editItem?.id){
+        const aba=tipo==='item'?'Itens':'Comunicados';
+        await apiUpdate(aba,editItem.id,dados);
+      } else {
+        await apiAdd(tipo==='item'?'Itens':'Comunicados',dados);
+      }
       await fetchData(true);
-      setShowAdd(false);
-      showToast('Adicionado ✓');
+      setShowAdd(false);setEditItem(null);
+      showToast(editItem?'Atualizado ✓':'Adicionado ✓');
     }catch(e){showToast('Erro: '+e.message,'err');}
     finally{setAddLoading(false);}
+  };
+
+  const handleDeleteItem=(item)=>{
+    setConfirm({msg:`Excluir "${item.titulo}"?`,onConfirm:async()=>{
+      setConfirm(null);
+      const aba=item.etiqueta!==undefined?'Comunicados':'Itens';
+      setItens(its=>its.filter(i=>i.id!==item.id));
+      setComunicados(cs=>cs.filter(c=>c.id!==item.id));
+      try{await apiDelete(aba,item.id);showToast('Excluído');}
+      catch(e){fetchData(true);showToast('Erro','err');}
+    }});
+  };
+
+  const handleArchiveCom=async(id)=>{
+    setComunicados(cs=>cs.map(c=>c.id===id?{...c,arquivado:'sim'}:c));
+    try{await apiUpdate('Comunicados',id,{arquivado:'sim'});showToast('Arquivado');}
+    catch(e){fetchData(true);showToast('Erro','err');}
+  };
+
+  const handleDeleteCom=(id)=>{
+    const com=comunicados.find(c=>c.id===id);
+    setConfirm({msg:`Excluir "${com?.titulo}"?`,onConfirm:async()=>{
+      setConfirm(null);
+      setComunicados(cs=>cs.filter(c=>c.id!==id));
+      try{await apiDelete('Comunicados',id);showToast('Excluído');}
+      catch(e){fetchData(true);showToast('Erro','err');}
+    }});
   };
 
   const handleWA=async()=>{
     const {wa}=getConfig();
     try{
       const data=await apiGet();
-      const itens2=data.itens||[];
-      const MESES2=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-      const toDate=s=>{const p=s.split('/');return new Date(p[2],p[1]-1,p[0]);};
-      const nowD=new Date();
-      const pendentes=itens2.filter(i=>i.status!=='concluido'&&i.status!=='concluído');
-      const semData=pendentes.filter(i=>!i.dataVenc);
-      const limite=addDays(nowD,30);
-      const proximos=pendentes.filter(i=>{if(!i.dataVenc)return false;const d=toDate(i.dataVenc);return d>=nowD&&d<=limite;}).sort((a,b)=>toDate(a.dataVenc)-toDate(b.dataVenc));
-      let texto=`📝 AGENDA MÁXIMUS\n${hoje()}\n`;
-      if(semData.length>0){texto+=`\n⭕ PENDÊNCIAS SEM DATA\n`;semData.forEach(i=>{texto+=`⭕ ${i.filho.toUpperCase()}: ${i.titulo} (${i.materia})\n`;});}
+      const pend=(data.itens||[]).filter(i=>i.status!=='concluido'&&i.status!=='cancelado');
+      const now=new Date();now.setHours(0,0,0,0);
+      const atrasados=pend.filter(i=>{const d=parseDate(i.dataVenc);return d&&d<now;});
+      const semData=pend.filter(i=>!i.dataVenc);
+      const proximos=pend.filter(i=>{const d=parseDate(i.dataVenc);return d&&d>=now;}).sort((a,b)=>parseDate(a.dataVenc)-parseDate(b.dataVenc));
+      let t=`📝 AGENDA MÁXIMUS\n${hoje()}\n`;
+      if(atrasados.length){t+=`\n🔴 ATRASADOS\n`;atrasados.forEach(i=>{t+=`🔴 ${i.filho.toUpperCase()}: ${i.titulo} (${getSub(i.materia).label})\n`;});}
+      if(semData.length){t+=`\n⭕ SEM DATA\n`;semData.forEach(i=>{t+=`⭕ ${i.titulo} (${getSub(i.materia).label}) · ${i.filho}\n`;});}
       let mesAtual='';
-      proximos.forEach(i=>{const p=i.dataVenc.split('/');const mes=MESES2[parseInt(p[1])];if(mes!==mesAtual){texto+=`\n🗓️ ${mes.toUpperCase()}\n`;mesAtual=mes;}const e=i.tipo==='prova'?'📝':'📌';texto+=`${e} ${i.dataVenc} — ${i.titulo} (${i.materia}) · ${i.filho==='iza'?'Iza':'Israel'}\n`;});
-      if(proximos.length===0&&semData.length===0)texto+='✅ Nada pendente nos próximos 30 dias!';
-      const url=`https://wa.me/${wa||''}?text=${encodeURIComponent(texto)}`;
-      window.open(url,'_blank');
+      proximos.forEach(i=>{const d=parseDate(i.dataVenc);const mes=MESES[d.getMonth()];if(mes!==mesAtual){t+=`\n🗓️ ${mes.toUpperCase()}\n`;mesAtual=mes;}t+=`${i.tipo==='prova'?'📝':'📌'} ${DIAS[d.getDay()]} ${i.dataVenc} — ${i.titulo} (${getSub(i.materia).label}) · ${i.filho}\n`;});
+      if(!atrasados.length&&!semData.length&&!proximos.length)t+='✅ Nada pendente!';
+      window.open(`https://wa.me/${wa||''}?text=${encodeURIComponent(t)}`,'_blank');
     }catch(e){showToast('Erro ao gerar resumo','err');}
   };
 
   const navScreens=['home','tasks','calendar','avisos'];
-  const showNav=navScreens.includes(screen);
-  const showFab=navScreens.includes(screen)&&screen!=='avisos';
-  const unread=comunicados.filter(c=>!c._lido).length;
+  const unread=comunicados.filter(c=>!c._lido&&c.arquivado!=='sim').length;
 
-  const handleNav=(id)=>{
-    if(id==='mais'){setShowMais(true);}
-    else{setScreen(id);setShowMais(false);}
-  };
+  const handleNav=id=>{if(id==='mais')setShowMais(true);else{setScreen(id);setShowMais(false);}};
+  const handleSetScreen=id=>{setScreen(id);setShowMais(false);};
 
-  const handleMaisSelect=(id)=>{setScreen(id);setShowMais(false);};
+  if(loading)return<div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#f5f5f7'}}>
+    <div style={{width:64,height:64,borderRadius:20,background:ACCENT,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:20,boxShadow:`0 8px 24px ${ACCENT}55`}}><span style={{fontSize:30}}>📚</span></div>
+    <h1 style={{fontSize:20,fontWeight:800,color:'#111',marginBottom:12}}>Agenda Máximus</h1>
+    <div style={{width:32,height:32,border:'3px solid #e5e7eb',borderTop:`3px solid ${ACCENT}`,borderRadius:'50%',animation:'spin .8s linear infinite'}}/>
+    <p style={{fontSize:12,color:'#aaa',marginTop:12}}>Carregando dados…</p>
+  </div>;
 
-  if(loading){
-    return(
-      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#f5f5f7'}}>
-        <div style={{width:60,height:60,borderRadius:18,background:ACCENT,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:20,boxShadow:`0 8px 24px ${ACCENT}55`}}>
-          <span style={{fontSize:28}}>📚</span>
-        </div>
-        <h1 style={{fontSize:20,fontWeight:800,color:'#111',marginBottom:8}}>Agenda Máximus</h1>
-        <div style={{width:32,height:32,border:`3px solid #e5e7eb`,borderTop:`3px solid ${ACCENT}`,borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
-        <p style={{fontSize:12,color:'#aaa',marginTop:12}}>Carregando dados…</p>
-      </div>
-    );
-  }
+  if(error)return<div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#f5f5f7',padding:32,textAlign:'center'}}>
+    <span style={{fontSize:48,marginBottom:16}}>⚠️</span>
+    <h2 style={{fontSize:18,fontWeight:800,color:'#111',marginBottom:8}}>Erro ao carregar</h2>
+    <p style={{fontSize:13,color:'#888',marginBottom:8,lineHeight:1.6}}>{error}</p>
+    <p style={{fontSize:11,color:'#ccc',marginBottom:20}}>⚠️ Ao reinstalar o app, as configurações são apagadas e precisam ser refeitas.</p>
+    <button onClick={()=>fetchData()} style={{padding:'12px 28px',background:ACCENT,color:'#fff',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',marginBottom:10}}>Tentar novamente</button>
+    <button onClick={()=>{setError(null);setScreen('configs');}} style={{padding:'12px 28px',background:'#fff',color:'#555',border:'1.5px solid #e0e0e0',borderRadius:12,fontSize:14,fontWeight:600,cursor:'pointer'}}>Abrir Configurações</button>
+  </div>;
 
-  if(error){
-    return(
-      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#f5f5f7',padding:32,textAlign:'center'}}>
-        <span style={{fontSize:48,marginBottom:16}}>⚠️</span>
-        <h2 style={{fontSize:18,fontWeight:800,color:'#111',marginBottom:8}}>Erro ao carregar</h2>
-        <p style={{fontSize:13,color:'#888',marginBottom:20,lineHeight:1.6}}>{error}</p>
-        <p style={{fontSize:12,color:'#aaa',marginBottom:4}}>Verifique a URL do Apps Script e o token nas Configurações.</p>
-        <p style={{fontSize:11,color:'#ccc',marginBottom:20}}>⚠️ Ao reinstalar o app, as configurações são apagadas e precisam ser refeitas.</p>
-        <button onClick={()=>fetchData()} style={{padding:'12px 28px',background:ACCENT,color:'#fff',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',marginBottom:10}}>Tentar novamente</button>
-        <button onClick={()=>{setError(null);setScreen('configs');}} style={{padding:'12px 28px',background:'#fff',color:'#555',border:'1.5px solid #e0e0e0',borderRadius:12,fontSize:14,fontWeight:600,cursor:'pointer'}}>Abrir Configurações</button>
-      </div>
-    );
-  }
+  return<div style={{flex:1,display:'flex',flexDirection:'column',background:'#f5f5f7',overflow:'hidden',position:'relative'}}>
+    {swReady&&<UpdateBanner apply={applyUpdate}/>}
+    {syncLoading&&<div style={{position:'fixed',top:0,left:0,right:0,height:3,background:`${ACCENT}22`,zIndex:200}}><div style={{height:'100%',background:ACCENT,width:'70%',transition:'width .5s'}}/></div>}
 
-  return(
-    <div style={{flex:1,display:'flex',flexDirection:'column',background:'#f5f5f7',overflow:'hidden',position:'relative'}}>
-      {/* SW Update banner */}
-      {swReady&&<UpdateBanner applyUpdate={applyUpdate}/>}
-
-      {/* Sync indicator */}
-      {syncLoading&&(
-        <div style={{position:'fixed',top:0,left:0,right:0,height:3,background:`${ACCENT}22`,zIndex:200}}>
-          <div style={{height:'100%',background:ACCENT,animation:'slideRight .6s ease',width:'60%'}}/>
-        </div>
-      )}
-
-      {/* Screens */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-        {screen==='home'&&<HomeScreen itens={itens} comunicados={comunicados} setScreen={(s)=>{setShowMais(false);setScreen(s);}} onWA={handleWA}/>}
-        {screen==='tasks'&&<TasksScreen itens={itens} onToggle={handleToggle} onDelete={handleDelete} loading={syncLoading}/>}
-        {screen==='calendar'&&<CalendarScreen itens={itens}/>}
-        {screen==='avisos'&&<AvisosScreen comunicados={comunicados} setComunicados={setComunicados} onDeleteCom={handleDeleteCom}/>}
-        {screen==='boletim'&&<BoletimScreen notas={notas} setScreen={setScreen}/>}
-        {screen==='horario'&&<HorarioScreen setScreen={setScreen}/>}
-        {screen==='configs'&&<ConfigsScreen setScreen={setScreen} onSync={()=>fetchData(true)}/>}
-      </div>
-
-      {/* Bottom nav */}
-      {showNav&&<BottomNav screen={screen} setScreen={handleNav} unread={unread}/>}
-
-      {/* FAB */}
-      {showFab&&<FAB onPress={()=>setShowAdd(true)}/>}
-
-      {/* Mais overlay */}
-      {showMais&&<MaisMenu setScreen={handleMaisSelect} onClose={()=>setShowMais(false)}/>}
-
-      {/* Add modal */}
-      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onSave={handleAdd} loading={addLoading}/>}
-
-      {/* Toast */}
-      {toast&&(
-        <div className="slideUp" style={{position:'fixed',bottom:`calc(90px + env(safe-area-inset-bottom,0px))`,left:'50%',transform:'translateX(-50%)',background:toast.type==='err'?'#DC2626':'#111',color:'#fff',padding:'10px 20px',borderRadius:24,fontSize:13,fontWeight:600,zIndex:300,whiteSpace:'nowrap',boxShadow:'0 4px 16px rgba(0,0,0,.2)'}}>
-          {toast.msg}
-        </div>
-      )}
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',paddingTop:swReady?40:0}}>
+      {screen==='home'&&<HomeScreen itens={itens} comunicados={comunicados} setScreen={handleSetScreen} setTasksFilter={setTasksFilter} onWA={handleWA}/>}
+      {screen==='tasks'&&<TasksScreen itens={itens} onToggle={handleToggle} onEdit={item=>{setEditItem(item);setShowAdd(true);}} onDelete={handleDeleteItem} initialFilter={tasksFilter}/>}
+      {screen==='calendar'&&<CalendarScreen itens={itens} onEdit={item=>{setEditItem(item);setShowAdd(true);}} onDelete={handleDeleteItem}/>}
+      {screen==='avisos'&&<AvisosScreen comunicados={comunicados} setComunicados={setComunicados} onArchive={handleArchiveCom} onDelete={handleDeleteCom} onEdit={item=>{setEditItem(item);setShowAdd(true);}}/>}
+      {screen==='boletim'&&<BoletimScreen notas={notas} setScreen={handleSetScreen}/>}
+      {screen==='provas'&&<ProvasScreen itens={itens} notas={notas} onToggle={handleToggle} onEdit={item=>{setEditItem(item);setShowAdd(true);}} onDelete={handleDeleteItem} setScreen={handleSetScreen}/>}
+      {screen==='horario'&&<HorarioScreen setScreen={handleSetScreen}/>}
+      {screen==='configs'&&<ConfigsScreen setScreen={handleSetScreen} onSync={()=>fetchData(true)}/>}
     </div>
-  );
+
+    {navScreens.includes(screen)&&<BottomNav screen={screen} setScreen={handleNav} unread={unread}/>}
+    {['home','tasks','calendar'].includes(screen)&&<FAB onPress={()=>{setEditItem(null);setShowAdd(true);}}/>}
+    {showMais&&<MaisMenu setScreen={handleSetScreen} onClose={()=>setShowMais(false)}/>}
+    {(showAdd||editItem)&&<AddEditModal item={editItem} onClose={()=>{setShowAdd(false);setEditItem(null);}} onSave={handleSaveItem} loading={addLoading}/>}
+    {confirm&&<ConfirmModal msg={confirm.msg} onConfirm={confirm.onConfirm} onCancel={()=>setConfirm(null)} confirmLabel="Excluir"/>}
+    {longPress&&<LongPressOverlay item={longPress} onClose={()=>setLongPress(null)}/>}
+    {toast&&<div className="slideUp" style={{position:'fixed',bottom:'calc(90px + env(safe-area-inset-bottom,0px))',left:'50%',transform:'translateX(-50%)',background:toast.type==='err'?'#DC2626':'#111',color:'#fff',padding:'10px 20px',borderRadius:24,fontSize:13,fontWeight:600,zIndex:300,whiteSpace:'nowrap',boxShadow:'0 4px 16px rgba(0,0,0,.2)'}}>{toast.msg}</div>}
+  </div>;
 };
 
-const root=ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 
 <script>
-// ── Service Worker: registro e detecção de atualização ──────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      // Verifica atualização a cada vez que o app abre
+if('serviceWorker'in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
       reg.update();
-
-      // Quando uma nova versão do SW está esperando para ativar
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Há uma nova versão disponível — notifica o React
-            window.__swUpdateReady = true;
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller){
+            window.__swUpdateReady=true;
             document.dispatchEvent(new CustomEvent('swUpdateReady'));
           }
         });
       });
-    }).catch(err => console.warn('SW registro falhou:', err));
-
-    // Se o SW foi atualizado em outra aba, recarrega esta
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
-    });
+    }).catch(e=>console.warn('SW:',e));
+    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
   });
 }
 </script>
