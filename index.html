@@ -771,8 +771,7 @@ const AvisosScreen=({comunicados,setComunicados,onArchive,onDelete,onEdit})=>{
         const t=getEtiq(item.etiqueta);
         const isUrg=item.etiqueta==='urgente';
         const isSel=selected.has(item.id);
-        return<ComCard key={item.id} item={item} selected={selected} setSelected={setSelected} onOpen={()=>{markLido(item.id);setDetail(item);}} onArchive={onArchive} isUrg={item.etiqueta==='urgente'}/> style={{background:isSel?'#EEF2FF':isUrg?'#FEF2F2':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',border:isSel?`1.5px solid ${ACCENT}`:isUrg?'1.5px solid #DC2626':'1.5px solid transparent',transition:'background .15s'}}>
-
+        return<ComCard key={item.id} item={item} selected={selected} setSelected={setSelected} onOpen={()=>{markLido(item.id);setDetail(item);}} onArchive={onArchive} isUrg={item.etiqueta==='urgente'}/>
       })}
     </div>
   </div>;
