@@ -420,7 +420,7 @@ const ItemDetalhe=({item,onClose,onEdit,onDelete})=>{
 // ═══════════════════════════════════════════════════════════════
 // HOME SCREEN
 // ═══════════════════════════════════════════════════════════════
-const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA,onItemPress})=>{
+const HomeScreen=({itens,comunicados,setScreen,setTasksFilter,onWA,onItemPress,waLoading})=>{
   const [filho,setFilho]=useState('all');
   const now=new Date();now.setHours(0,0,0,0);
   const hojeStr=hoje();
@@ -1184,7 +1184,7 @@ const App=()=>{
     {syncLoading&&<div style={{position:'fixed',top:0,left:0,right:0,height:3,background:`${ACCENT}22`,zIndex:200}}><div style={{height:'100%',background:ACCENT,width:'70%',transition:'width .5s'}}/></div>}
 
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',paddingTop:swReady?40:0}}>
-      {screen==='home'&&(homeDetail?<ItemDetalhe item={homeDetail} onClose={()=>setHomeDetail(null)} onEdit={item=>{setHomeDetail(null);setEditItem(item);setShowAdd(true);}} onDelete={item=>{setHomeDetail(null);handleDeleteItem(item);}}/>:<HomeScreen itens={itens} comunicados={comunicados} setScreen={handleSetScreen} setTasksFilter={setTasksFilter} onWA={handleWA} onItemPress={item=>setHomeDetail(item)}/>)}
+      {screen==='home'&&(homeDetail?<ItemDetalhe item={homeDetail} onClose={()=>setHomeDetail(null)} onEdit={item=>{setHomeDetail(null);setEditItem(item);setShowAdd(true);}} onDelete={item=>{setHomeDetail(null);handleDeleteItem(item);}}/>:<HomeScreen itens={itens} comunicados={comunicados} setScreen={handleSetScreen} setTasksFilter={setTasksFilter} onWA={handleWA} onItemPress={item=>setHomeDetail(item)} waLoading={waLoading}/>)}
       {screen==='tasks'&&<TasksScreen itens={itens} onToggle={handleToggle} onEdit={item=>{setEditItem(item);setShowAdd(true);}} onDelete={handleDeleteItem} initialFilter={tasksFilter}/>}
       {screen==='calendar'&&<CalendarScreen itens={itens} onEdit={item=>{setEditItem(item);setShowAdd(true);}} onDelete={handleDeleteItem}/>}
       {screen==='avisos'&&<AvisosScreen comunicados={comunicados} setComunicados={setComunicados} onArchive={handleArchiveCom} onDelete={handleDeleteCom} onEdit={item=>{setEditItem(item);setShowAdd(true);}}/>}
