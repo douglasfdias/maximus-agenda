@@ -662,6 +662,34 @@ const CalendarScreen=({itens,onEdit,onDelete})=>{
   </div>;
 };
 
+// ─── COMUNICADO CARD COMPONENT (hooks at component level) ────
+const ComCard=({item,selected,setSelected,onOpen,onArchive})=>{
+  const t=getEtiq(item.etiqueta);
+  const isUrg=item.etiqueta==='urgente';
+  const isSel=selected.has(item.id);
+  const lp=useLongPress(onOpen,()=>setSelected(s=>{const n=new Set(s);n.add(item.id);return n;}));
+  const toggleSel=e=>{e.stopPropagation();setSelected(s=>{const n=new Set(s);isSel?n.delete(item.id):n.add(item.id);return n;});};
+  return<div {...lp} style={{background:isSel?'#EEF2FF':isUrg?'#FEF2F2':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',border:isSel?`1.5px solid ${ACCENT}`:isUrg?'1.5px solid #DC2626':'1.5px solid transparent',transition:'background .15s'}}>
+    {!item._lido&&!isSel&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:isUrg?'#DC2626':ACCENT}}/>}
+    {selected.size>0&&<div onClick={toggleSel} style={{width:22,height:22,borderRadius:11,border:`2px solid ${isSel?ACCENT:'#ccc'}`,background:isSel?ACCENT:'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'center'}}>
+      {isSel&&<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="2,5 4,7.5 8,2.5" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round"/></svg>}
+    </div>}
+    <div style={{width:36,height:36,borderRadius:10,background:t.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,position:'relative'}}>
+      <span style={{fontSize:16}}>{t.e}</span>
+      {isUrg&&<div className="pulse" style={{position:'absolute',top:-2,right:-2,width:8,height:8,borderRadius:4,background:'#DC2626',border:'2px solid #FEF2F2'}}/>}
+    </div>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:2}}>
+        <span style={{fontSize:10,fontWeight:700,color:isUrg?'#DC2626':t.c}}>{isUrg?'🚨 URGENTE':t.label}</span>
+        <span style={{fontSize:10,color:'#bbb'}}>{item.data}</span>
+      </div>
+      <p style={{fontSize:13,fontWeight:item._lido?500:700,color:isUrg?'#7F1D1D':'#111',marginBottom:2,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.titulo}</p>
+      <p style={{fontSize:11,color:'#aaa',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.remetente||item.filho}</p>
+    </div>
+    {selected.size===0&&<button onClick={e=>{e.stopPropagation();onArchive(item.id);}} style={{background:'transparent',border:'none',padding:'4px 2px',cursor:'pointer',opacity:.35,flexShrink:0,fontSize:15,alignSelf:'center'}}>📦</button>}
+  </div>;
+};
+
 // ═══════════════════════════════════════════════════════════════
 // AVISOS SCREEN
 // ═══════════════════════════════════════════════════════════════
@@ -743,26 +771,8 @@ const AvisosScreen=({comunicados,setComunicados,onArchive,onDelete,onEdit})=>{
         const t=getEtiq(item.etiqueta);
         const isUrg=item.etiqueta==='urgente';
         const isSel=selected.has(item.id);
-        const lp=useLongPress(()=>{markLido(item.id);setDetail(item);},()=>setSelected(s=>{const n=new Set(s);n.add(item.id);return n;}));
-        return<div key={item.id} {...lp} style={{background:isSel?'#EEF2FF':isUrg?'#FEF2F2':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',border:isSel?`1.5px solid ${ACCENT}`:isUrg?'1.5px solid #DC2626':'1.5px solid transparent',transition:'background .15s'}}>
-          {!item._lido&&!isSel&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:isUrg?'#DC2626':ACCENT}}/>}
-          {selected.size>0&&<div onClick={e=>{e.stopPropagation();setSelected(s=>{const n=new Set(s);isSel?n.delete(item.id):n.add(item.id);return n;});}} style={{width:22,height:22,borderRadius:11,border:`2px solid ${isSel?ACCENT:'#ccc'}`,background:isSel?ACCENT:'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'center'}}>
-            {isSel&&<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="2,5 4,7.5 8,2.5" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round"/></svg>}
-          </div>}
-          <div style={{width:36,height:36,borderRadius:10,background:t.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,position:'relative'}}>
-            <span style={{fontSize:16}}>{t.e}</span>
-            {isUrg&&<div className="pulse" style={{position:'absolute',top:-2,right:-2,width:8,height:8,borderRadius:4,background:'#DC2626',border:'2px solid #FEF2F2'}}/>}
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:2}}>
-              <span style={{fontSize:10,fontWeight:700,color:isUrg?'#DC2626':t.c}}>{isUrg?'🚨 URGENTE':t.label}</span>
-              <span style={{fontSize:10,color:'#bbb'}}>{item.data}</span>
-            </div>
-            <p style={{fontSize:13,fontWeight:item._lido?500:700,color:isUrg?'#7F1D1D':'#111',marginBottom:2,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.titulo}</p>
-            <p style={{fontSize:11,color:'#aaa',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{item.remetente||item.filho}</p>
-          </div>
-          {selected.size===0&&<button onClick={e=>{e.stopPropagation();onArchive(item.id);}} style={{background:'transparent',border:'none',padding:'4px 2px',cursor:'pointer',opacity:.35,flexShrink:0,fontSize:15,alignSelf:'center'}}>📦</button>}
-        </div>;
+        return<ComCard key={item.id} item={item} selected={selected} setSelected={setSelected} onOpen={()=>{markLido(item.id);setDetail(item);}} onArchive={onArchive} isUrg={item.etiqueta==='urgente'}/> style={{background:isSel?'#EEF2FF':isUrg?'#FEF2F2':'#fff',borderRadius:14,padding:'12px 14px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer',position:'relative',overflow:'hidden',border:isSel?`1.5px solid ${ACCENT}`:isUrg?'1.5px solid #DC2626':'1.5px solid transparent',transition:'background .15s'}}>
+
       })}
     </div>
   </div>;
