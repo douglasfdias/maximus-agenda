@@ -3,7 +3,7 @@
 //  Ao subir nova versão do app, incremente o número abaixo:
 //  v1 → v2 → v3 → ...
 // ══════════════════════════════════════════════════════════════════
-const VERSION = 'v20';
+const VERSION = 'v19';
 const CACHE = 'maximus-' + VERSION;
 const ASSETS = [
   '/maximus-agenda/',
@@ -11,7 +11,6 @@ const ASSETS = [
   '/maximus-agenda/manifest.json',
   '/maximus-agenda/vendor/react.production.min.js',
   '/maximus-agenda/vendor/react-dom.production.min.js',
-  '/maximus-agenda/vendor/babel.min.js',
 ];
 
 self.addEventListener('install', e => {
